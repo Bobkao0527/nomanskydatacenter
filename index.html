@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>無人深空跑商導航系統 (NMS Trade Planner)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🚀 無人深空跑商導航系統</h1>
+      <button id="refresh-btn">🔄 同步後端資料</button>
+    </header>
+
+    <main>
+      <!-- 新增星系表單 -->
+      <section class="card-form">
+        <h2>新增星系站點</h2>
+        <form id="add-system-form">
+          <input type="text" id="sys-name" placeholder="星系名稱 (例: 01_採礦_Alpha)" required>
+          
+          <select id="sys-type" required>
+            <option value="" disabled selected>選擇貿易類型</option>
+            <optgroup label="鏈條 A (3星系)">
+              <option value="商業">商業 / 貿易 (🟢)</option>
+              <option value="高級材料">高級材料 (🟣)</option>
+              <option value="科學">科學 (🔵)</option>
+            </optgroup>
+            <optgroup label="鏈條 B (4星系)">
+              <option value="採礦">採礦 (🟠)</option>
+              <option value="製造">製造 (🟡)</option>
+              <option value="科技">科技 (🔷)</option>
+              <option value="發電">發電 (🔴)</option>
+            </optgroup>
+          </select>
+
+          <select id="sys-level" required>
+            <option value="3">3 星 (高/富有/繁榮)</option>
+            <option value="2">2 星 (中/平均/良好)</option>
+            <option value="1">1 星 (低/貧瘠/失敗)</option>
+          </select>
+
+          <input type="number" id="sys-buy" placeholder="買入 (Buy %)" step="0.1">
+          <input type="number" id="sys-sell" placeholder="賣出 (Sell %)" step="0.1">
+
+          <button type="submit">新增站點</button>
+        </form>
+      </section>
+
+      <!-- 星系列表顯示區 -->
+      <section class="system-list-section">
+        <h2>貿易站點列表</h2>
+        <div id="system-list" class="grid-container">
+          <!-- 動態渲染星系卡片 -->
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 依順序引入 JS 模組 -->
+  <script src="js/logic.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
