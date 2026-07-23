@@ -1,68 +1,80 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NMS 太空船數據終端機 (Space HUD Terminal)</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NMS // CYBER HUD TERMINAL</title>
+    <!-- 引入高科技 HUD 專用字體與圖示 -->
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <div id="app" class="hud-container">
-    <!-- 頂部 HUD 標頭 -->
-    <header class="hud-header">
-      <div class="brand">
-        <span class="hud-pulse"></span>
-        <h1>NMS // TERMINAL v2.5</h1>
-      </div>
-      <nav class="hud-tabs">
-        <button class="tab-btn active" data-tab="trading">📈 貿易星系網絡</button>
-        <button class="tab-btn" data-tab="data">🪐 勘探生態圖鑑</button>
-        <button class="tab-btn" data-tab="money">💰 商業資產帳本</button>
-      </nav>
-      <button id="sync-btn" class="hud-btn glow">🔄 雲端同步</button>
-    </header>
+<body class="hud-theme">
+    <div id="app-container">
+        <!-- TOP HUD HEADER -->
+        <header class="hud-header">
+            <div class="header-left">
+                <div class="hud-pulse-dot"></div>
+                <span class="hud-logo font-mono"><i class="fa-solid fa-satellite"></i> NMS_HUD // DECK v2.5</span>
+            </div>
+            <nav class="hud-tabs font-mono">
+                <button class="tab-btn active" data-tab="trading"><i class="fa-solid fa-chart-line"></i> 貿易網絡</button>
+                <button class="tab-btn" data-tab="data"><i class="fa-solid fa-globe"></i> 勘探圖鑑</button>
+                <button class="tab-btn" data-tab="money"><i class="fa-solid fa-vault"></i> 資產帳本</button>
+            </nav>
+            <div class="header-right font-mono">
+                <button id="sync-btn" class="hud-btn glow-cyan"><i class="fa-solid fa-arrows-rotate"></i> CLOUD_SYNC</button>
+            </div>
+        </header>
 
-    <!-- 主工作區域：兩欄式（左列表/右詳細資訊） -->
-    <main class="hud-body">
-      <!-- 左側：搜尋與列表 -->
-      <section class="panel-left">
-        <div class="controls-bar">
-          <input type="text" id="search-input" placeholder="🔍 搜尋星系/星球/資源..." />
-          <button id="add-btn" class="hud-btn success">+ 新增資料</button>
-        </div>
-        <div id="item-list" class="hud-list">
-          <!-- 動態渲染列表內容 -->
-        </div>
-      </section>
+        <!-- MAIN LAYOUT -->
+        <main class="ide-body">
+            <!-- LEFT PANEL: 搜尋與列表 -->
+            <section class="hud-sub-panel left-panel">
+                <div class="panel-header font-mono">
+                    <span class="panel-title"><i class="fa-solid fa-list-check"></i> SYSTEM_INDEX</span>
+                    <button id="add-btn" class="hud-btn glow-cyan">+ NEW_DATA</button>
+                </div>
+                <div class="controls-bar">
+                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                    <input type="text" id="search-input" class="hud-input font-mono" placeholder="SEARCH_KEYWORD..." />
+                </div>
+                <div id="item-list" class="hud-list font-mono">
+                    <!-- 動態渲染列表 -->
+                </div>
+            </section>
 
-      <!-- 右側：詳細資訊展報 (Detail View) -->
-      <section class="panel-right">
-        <div id="detail-view" class="hud-card detail-card">
-          <div class="empty-state">請選擇左側項目以檢視詳細數據數據鏈</div>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <!-- Modal 彈窗：新增數據 -->
-  <div id="modal-overlay" class="modal-overlay hidden">
-    <div class="hud-card modal-card">
-      <div class="modal-header">
-        <h3 id="modal-title">新增資料</h3>
-        <button id="modal-close" class="close-btn">&times;</button>
-      </div>
-      <form id="hud-form">
-        <div id="form-fields"></div>
-        <div class="modal-footer">
-          <button type="submit" class="hud-btn success">確認提交</button>
-        </div>
-      </form>
+            <!-- RIGHT PANEL: 樹狀詳細資訊展報 -->
+            <section class="hud-sub-panel right-panel">
+                <div class="panel-header font-mono">
+                    <span class="panel-title"><i class="fa-solid fa-terminal"></i> COGNITIVE_DETAIL_VIEW</span>
+                </div>
+                <div id="detail-view" class="viewer-content font-mono">
+                    <div class="empty-state">[SYSTEM_READY] 請選擇左側數據卡片以展開節點...</div>
+                </div>
+            </section>
+        </main>
     </div>
-  </div>
 
-  <!-- 引入 JS 模組 -->
-  <script src="js/logic.js"></script>
-  <script src="js/data.js"></script>
-  <script src="js/app.js"></script>
+    <!-- MODAL 彈窗：新增數據 -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="hud-card modal-card">
+            <div class="panel-header font-mono">
+                <span class="panel-title" id="modal-title"><i class="fa-solid fa-pen-to-square"></i> INPUT_DATA_NODE</span>
+                <button id="modal-close" class="close-btn">&times;</button>
+            </div>
+            <form id="hud-form" class="font-mono">
+                <div id="form-fields"></div>
+                <div class="modal-footer" style="margin-top: 15px;">
+                    <button type="submit" class="hud-btn glow-cyan w-full"><i class="fa-solid fa-floppy-disk"></i> SUBMIT_TO_DECK</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 腳本引入 -->
+    <script src="js/logic.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

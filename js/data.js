@@ -1,5 +1,5 @@
 /**
- * 終端機集中資料數據中心
+ * HUD Terminal 快取數據中心
  */
 const TerminalData = {
   trading: [],
@@ -7,16 +7,16 @@ const TerminalData = {
   money: [],
 
   init() {
-    this.trading = JSON.parse(localStorage.getItem('nms_hud_trading') || '[]');
-    this.data = JSON.parse(localStorage.getItem('nms_hud_data') || '[]');
-    this.money = JSON.parse(localStorage.getItem('nms_hud_money') || '[]');
+    this.trading = JSON.parse(localStorage.getItem('cyber_nms_trading') || '[]');
+    this.data = JSON.parse(localStorage.getItem('cyber_nms_data') || '[]');
+    this.money = JSON.parse(localStorage.getItem('cyber_nms_money') || '[]');
   },
 
   get(sheet) { return this[sheet] || []; },
 
   set(sheet, list) {
     this[sheet] = list;
-    localStorage.setItem(`nms_hud_${sheet}`, JSON.stringify(list));
+    localStorage.setItem(`cyber_nms_${sheet}`, JSON.stringify(list));
   },
 
   add(sheet, item) {
