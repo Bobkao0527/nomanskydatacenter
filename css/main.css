@@ -1,0 +1,57 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background-color: var(--dark-bg);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-image: 
+        linear-gradient(rgba(255, 140, 0, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 140, 0, 0.05) 1px, transparent 1px);
+    background-size: 30px 30px;
+}
+
+.hud-container {
+    width: 95vw;
+    height: 95vh;
+    border: 2px solid var(--primary-color);
+    box-shadow: var(--border-glow);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    position: relative;
+    z-index: 10;
+    background: radial-gradient(circle at center, rgba(255, 140, 0, 0.05) 0%, var(--dark-bg) 100%);
+}
+
+.hud-container::before, .hud-container::after {
+    content: ''; position: absolute; width: 40px; height: 40px;
+    border: 3px solid var(--secondary-color); pointer-events: none;
+}
+.hud-container::before {
+    top: -2px; left: -2px; border-right: none; border-bottom: none;
+    box-shadow: -2px -2px 10px rgba(255, 170, 0, 0.5);
+}
+.hud-container::after {
+    bottom: -2px; left: -2px; border-right: none; border-top: none;
+    box-shadow: -2px 2px 10px rgba(255, 170, 0, 0.5);
+}
+
+.hud-header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--primary-color); padding-bottom: 15px; margin-bottom: 20px;
+}
+.hud-logo { font-size: 26px; font-weight: bold; color: var(--secondary-color); text-shadow: var(--glow-shadow); letter-spacing: 4px; }
+.status-ok { color: var(--status-ok); text-shadow: 0 0 8px var(--status-ok); }
+
+.hud-layout { display: flex; flex: 1; gap: 25px; overflow: hidden; }
+.sidebar { width: 320px; border-right: 1px solid rgba(255, 140, 0, 0.3); display: flex; flex-direction: column; padding-right: 20px; }
+.detail-panel { flex: 1; background: var(--panel-bg); border: 1px solid rgba(255, 140, 0, 0.2); padding: 30px; position: relative; overflow-y: auto; }
+
+.hud-corner { position: absolute; width: 20px; height: 20px; border: 2px solid var(--secondary-color); pointer-events: none; }
+.hud-corner.top-right { top: -1px; right: -1px; border-left: none; border-bottom: none; }
+.hud-corner.bottom-right { bottom: -1px; right: -1px; border-left: none; border-top: none; }
