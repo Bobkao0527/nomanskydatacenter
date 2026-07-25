@@ -111,3 +111,36 @@ body {
 .hud-corner { position: absolute; width: 16px; height: 16px; border: 2px solid var(--secondary-color); pointer-events: none; }
 .hud-corner.top-right { top: -1px; right: -1px; border-left: none; border-bottom: none; }
 .hud-corner.bottom-right { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+/* 多選標籤容器 */
+.tag-group-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 6px 0;
+}
+
+/* 未選中的標籤 */
+.tag-btn {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    color: #e0e0e0 !important;
+    padding: 4px 10px !important;
+    border-radius: 12px !important;
+    font-size: 13px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.tag-btn:hover {
+    border-color: #00f0ff !important;
+    color: #ffffff !important;
+}
+
+/* 🌟 被選中 (點亮) 的標籤 */
+.tag-btn.tag-active {
+    background: rgba(0, 240, 255, 0.25) !important;
+    border-color: #00f0ff !important;
+    color: #00f0ff !important;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.5) !important;
+    font-weight: bold;
+}

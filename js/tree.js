@@ -2,12 +2,19 @@ export class TreeView {
     constructor(containerId, onSelectNodeChange) {
         this.container = document.getElementById(containerId);
         this.onSelectNodeChange = onSelectNodeChange;
-        this.treeData = [];
-        this.selectedNodeId = null;
-        // 紀錄展開狀態的資料夾 ID 集合
-        this.expandedNodeIds = new Set();
+        this.treeData = {};
+        this.selectedPath = null; // 儲存當前點擊的路徑 (以 '/' 隔開)
+        this.expandedPaths = new Set();
 
         this.bindEvents();
+    }
+
+    // 判斷是否為 Data 節點 (如果 Value 內部全是字串/數值，沒有包物件)
+    static isDataNode(obj) {
+        if (typeof obj !== 'object' || obj === null) return false;
+        const keys = Object.keys(obj);
+        if (keys.length === 0) return false; // 空物件預設當作 Folder
+        return keys.every(k => typeof obj[k] !== 'object' || obj[k] === null);
     }
 
     bindEvents() {
@@ -16,19 +23,18 @@ export class TreeView {
             if (!label) return;
 
             const li = label.parentElement;
-            const nodeId = li.dataset.id;
+            const path = li.dataset.path;
 
-            this.selectNode(nodeId);
+            this.selectNode(path);
 
-            // 切換折疊狀態並紀錄
             const hasChildren = li.querySelector('.tree-list');
             if (hasChildren) {
                 li.classList.toggle('open');
                 const isOpen = li.classList.contains('open');
                 if (isOpen) {
-                    this.expandedNodeIds.add(nodeId);
+                    this.expandedPaths.add(path);
                 } else {
-                    this.expandedNodeIds.delete(nodeId);
+                    this.expandedPaths.delete(path);
                 }
                 const arrow = label.querySelector('.tree-arrow');
                 if (arrow) arrow.textContent = isOpen ? '▼' : '▶';
@@ -36,152 +42,133 @@ export class TreeView {
         });
     }
 
-    selectNode(nodeId) {
-        this.selectedNodeId = nodeId;
+    // 透過路徑陣列在 Dictionary 中尋找目標物件
+    getNodeByPath(pathArr) {
+        let current = this.treeData;
+        for (const key of pathArr) {
+            if (current && current[key] !== undefined) {
+                current = current[key];
+            } else {
+                return null;
+            }
+        }
+        return current;
+    }
+
+    // 取得父節點物件與目標 Key
+    getParentAndKey(pathArr) {
+        if (pathArr.length === 0) return { parent: null, key: null };
+        const key = pathArr[pathArr.length - 1];
+        const parentPath = pathArr.slice(0, -1);
+        const parent = parentPath.length === 0 ? this.treeData : this.getNodeByPath(parentPath);
+        return { parent, key, parentPath };
+    }
+
+    selectNode(pathStr) {
+        this.selectedPath = pathStr;
         this.container.querySelectorAll('.node-label').forEach(el => el.classList.remove('selected'));
-        const targetLi = this.container.querySelector(`li[data-id="${nodeId}"]`);
+        const targetLi = this.container.querySelector(`li[data-path="${CSS.escape(pathStr)}"]`);
         if (targetLi) {
-            const label = targetLi.querySelector('.node-label');
-            label?.classList.add('selected');
+            targetLi.querySelector('.node-label')?.classList.add('selected');
         }
 
-        const nodeObj = this.findNodeById(this.treeData, nodeId);
-        this.onSelectNodeChange(nodeObj);
-    }
+        const pathArr = pathStr ? pathStr.split('/') : [];
+        const nodeObj = pathArr.length > 0 ? this.getNodeByPath(pathArr) : this.treeData;
+        const { key } = this.getParentAndKey(pathArr);
 
-    findNodeById(nodes, id) {
-        for (const node of nodes) {
-            if (node.id === id) return node;
-            if (node.children && node.children.length > 0) {
-                const found = this.findNodeById(node.children, id);
-                if (found) return found;
-            }
-        }
-        return null;
-    }
-
-    findParentNode(nodes, targetId, parent = null) {
-        for (const node of nodes) {
-            if (node.id === targetId) return parent;
-            if (node.children) {
-                const found = this.findParentNode(node.children, targetId, node);
-                if (found) return found;
-            }
-        }
-        return null;
-    }
-
-    addNode(type, defaultTemplate) {
-        const newNode = {
-            id: 'node_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
-            ...JSON.parse(JSON.stringify(defaultTemplate)),
-            type: type
-        };
-
-        if (!this.selectedNodeId) {
-            this.treeData.push(newNode);
-        } else {
-            const targetNode = this.findNodeById(this.treeData, this.selectedNodeId);
-            if (targetNode.type === 'folder') {
-                targetNode.children = targetNode.children || [];
-                targetNode.children.push(newNode);
-                // 新增目標是 Folder，自動展開該 Folder
-                this.expandedNodeIds.add(targetNode.id);
-            } else {
-                const parentNode = this.findParentNode(this.treeData, this.selectedNodeId);
-                if (parentNode) {
-                    parentNode.children.push(newNode);
-                } else {
-                    this.treeData.push(newNode);
-                }
-            }
-        }
-
-        this.render(this.treeData);
-        // 新增完成後，自動將指標 focus 到新節點上
-        this.selectNode(newNode.id);
-        return newNode;
-    }
-
-    deleteSelectedNode() {
-        if (!this.selectedNodeId) return false;
-
-        const removeRecursive = (nodes, id) => {
-            const index = nodes.findIndex(n => n.id === id);
-            if (index !== -1) {
-                nodes.splice(index, 1);
-                return true;
-            }
-            for (const node of nodes) {
-                if (node.children && removeRecursive(node.children, id)) return true;
-            }
-            return false;
-        };
-
-        const success = removeRecursive(this.treeData, this.selectedNodeId);
-        if (success) {
-            this.expandedNodeIds.delete(this.selectedNodeId);
-            this.selectedNodeId = null;
-            this.render(this.treeData);
-        }
-        return success;
-    }
-
-    filter(keyword) {
-        const lowerKw = keyword.toLowerCase();
-        const items = this.container.querySelectorAll('.tree-item');
-
-        if (!keyword) {
-            items.forEach(item => item.classList.remove('hidden'));
-            return;
-        }
-
-        items.forEach(item => {
-            const labelText = item.querySelector('.node-title').textContent.toLowerCase();
-            if (labelText.includes(lowerKw)) {
-                item.classList.remove('hidden');
-                let parent = item.parentElement.closest('.tree-item');
-                while (parent) {
-                    parent.classList.remove('hidden');
-                    parent.classList.add('open');
-                    parent = parent.parentElement.closest('.tree-item');
-                }
-            } else {
-                item.classList.add('hidden');
-            }
+        this.onSelectNodeChange({
+            pathStr,
+            pathArr,
+            nodeName: key || 'ROOT',
+            data: nodeObj,
+            isData: TreeView.isDataNode(nodeObj)
         });
     }
 
+    // 新增 Folder 或 Data (修復命名與撞名邏輯)
+    addNode(type, defaultContent, nodeName = '') {
+        let parentObj = this.treeData;
+        let parentPathArr = [];
+
+        if (this.selectedPath) {
+            const currentPathArr = this.selectedPath.split('/');
+            const currentObj = this.getNodeByPath(currentPathArr);
+
+            if (TreeView.isDataNode(currentObj)) {
+                // 如果當前選到的是 Data，則新增到其同級的 Folder 內
+                const { parent, parentPath } = this.getParentAndKey(currentPathArr);
+                parentObj = parent;
+                parentPathArr = parentPath;
+            } else {
+                // 如果當前是 Folder，新增至其底下
+                parentObj = currentObj;
+                parentPathArr = currentPathArr;
+            }
+        }
+
+        // 1. 優先採用輸入的 nodeName，若沒輸入則用預設名稱
+        const defaultName = type === 'folder' ? '新分類' : '新數據';
+        const baseName = nodeName.trim() || defaultName;
+
+        // 2. 判斷是否有同名 Key，沒重複就直接用原名，重複才補 _1, _2
+        let newKey = baseName;
+        let count = 1;
+        while (parentObj.hasOwnProperty(newKey)) {
+            newKey = `${baseName}_${count}`;
+            count++;
+        }
+
+        // 寫入新節點
+        parentObj[newKey] = JSON.parse(JSON.stringify(defaultContent));
+
+        const newPathStr = [...parentPathArr, newKey].join('/');
+        this.expandedPaths.add(parentPathArr.join('/'));
+        
+        this.render(this.treeData);
+        this.selectNode(newPathStr);
+    }
+
+    deleteSelectedNode() {
+        if (!this.selectedPath) return false;
+        const pathArr = this.selectedPath.split('/');
+        const { parent, key } = this.getParentAndKey(pathArr);
+
+        if (parent && key && parent.hasOwnProperty(key)) {
+            delete parent[key];
+            this.expandedPaths.delete(this.selectedPath);
+            this.selectedPath = null;
+            this.render(this.treeData);
+            return true;
+        }
+        return false;
+    }
+
     render(treeData) {
-        this.treeData = treeData;
-        if (!treeData || treeData.length === 0) {
-            this.container.innerHTML = '<div style="text-align:center; color:var(--text-muted); margin-top:20px;">[ NO DATA ]</div>';
-            return;
-        }
+        this.treeData = treeData || {};
 
-        // 首次渲染預設將第一層 Folder 展開
-        if (this.expandedNodeIds.size === 0) {
-            treeData.forEach(node => {
-                if (node.type === 'folder') this.expandedNodeIds.add(node.id);
-            });
-        }
-
-        const renderNodes = (nodes) => {
+        const buildHtml = (obj, currentPathArr = []) => {
             let html = '<ul class="tree-list">';
-            nodes.forEach(node => {
-                const isFolder = node.type === 'folder';
-                const hasChildren = isFolder && node.children && node.children.length > 0;
-                const isSelected = node.id === this.selectedNodeId ? 'selected' : '';
-                const isOpen = this.expandedNodeIds.has(node.id) ? 'open' : '';
+            const keys = Object.keys(obj);
+
+            keys.forEach(key => {
+                const val = obj[key];
+                const isData = TreeView.isDataNode(val);
+                const isFolder = !isData;
+                const pathArr = [...currentPathArr, key];
+                const pathStr = pathArr.join('/');
+                
+                const isSelected = pathStr === this.selectedPath ? 'selected' : '';
+                const isOpen = this.expandedPaths.has(pathStr) ? 'open' : '';
+                const hasChildren = isFolder && Object.keys(val).length > 0;
 
                 html += `
-                    <li class="tree-item ${isOpen}" data-id="${node.id}">
+                    <li class="tree-item ${isOpen}" data-path="${pathStr}">
                         <div class="node-label ${isFolder ? 'node-folder' : 'node-data'} ${isSelected}">
                             <span class="tree-arrow">${isFolder ? (hasChildren ? (isOpen ? '▼' : '▶') : '▶') : '-'}</span>
                             <span class="node-icon">${isFolder ? '📁' : '📄'}</span>
-                            <span class="node-title">${node.name || 'UNNAMED'}</span>
+                            <span class="node-title">${key}</span>
                         </div>
-                        ${isFolder ? renderNodes(node.children || []) : ''}
+                        ${isFolder ? buildHtml(val, pathArr) : ''}
                     </li>
                 `;
             });
@@ -189,6 +176,6 @@ export class TreeView {
             return html;
         };
 
-        this.container.innerHTML = renderNodes(treeData);
+        this.container.innerHTML = buildHtml(this.treeData);
     }
 }

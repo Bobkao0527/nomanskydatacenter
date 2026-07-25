@@ -1,37 +1,39 @@
 export class ShowView {
-    constructor(containerId, onNodeUpdated) {
+    constructor(containerId, schemaConfig, onNodeUpdated) {
         this.container = document.getElementById(containerId);
+        this.schemaConfig = schemaConfig || {};
         this.onNodeUpdated = onNodeUpdated;
-        this.currentNode = null;
+        this.currentInfo = null;
     }
 
-    render(node) {
-        this.currentNode = node;
-        if (!node) {
+    render(nodeInfo) {
+        this.currentInfo = nodeInfo;
+        if (!nodeInfo || !nodeInfo.pathStr) {
             this.container.innerHTML = '<div style="text-align:center; color:var(--text-muted); margin-top:50px;">NO NODE SELECTED</div>';
             return;
         }
 
-        const isFolder = node.type === 'folder';
+        const { nodeName, data, isData } = nodeInfo;
+        const valueOptionsConfig = this.schemaConfig.valueOptions || {};
+        const multiSelectConfig = this.schemaConfig.multiSelectOptions || {}; // 👈 1. 新增：取得多選設定
 
         let html = `
             <div class="editor-header">
-                <input type="text" id="edit-node-name" value="${node.name || ''}" placeholder="節點名稱">
-                <span class="badge">${isFolder ? '資料夾 (Folder)' : '資料節點 (Data)'}</span>
+                <input type="text" id="edit-node-name" value="${nodeName}" placeholder="節點名稱">
+                <span class="badge">${!isData ? '分類目錄 (Folder)' : '資料欄位 (Data)'}</span>
             </div>
         `;
 
-        if (isFolder) {
-            const childCount = node.children ? node.children.length : 0;
-            html += `<p style="color:var(--text-muted);">子項目數量：${childCount} 個</p>`;
+        if (!isData) {
+            const childCount = Object.keys(data || {}).length;
+            html += `<p style="color:var(--text-muted);">內部包含子項目：${childCount} 個</p>`;
         } else {
-            node.attributes = node.attributes || {};
-            const entries = Object.entries(node.attributes);
+            const entries = Object.entries(data || {});
 
             html += `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <span style="color:var(--text-light)">動態屬性列表 (Key-Value)</span>
-                    <button class="hud-btn small" id="btn-add-attr">+ 增加屬性</button>
+                    <span style="color:var(--text-light)">屬性表單 (Key-Value)</span>
+                    <button class="hud-btn small" id="btn-add-attr">+ 增加自訂屬性</button>
                 </div>
                 <table class="attr-table">
                     <thead>
@@ -45,13 +47,59 @@ export class ShowView {
             `;
 
             entries.forEach(([key, val], idx) => {
+                const multiOptions = multiSelectConfig[key]; // 👈 取出多選選項
+                const options = valueOptionsConfig[key];      // 取出單選選項
+                let valueControlHtml = '';
+
+                // 👈 2. 優先判斷：如果是多選標籤欄位 (例如：礦物、植物)
+                if (multiOptions && Array.isArray(multiOptions)) {
+                    // 將當前字串切割成陣列 (例如 "鈉, 銅" -> ["鈉", "銅"])
+                    const selectedList = val ? String(val).split(',').map(s => s.trim()) : [];
+
+                    const tagsHtml = multiOptions.map(opt => {
+                        const isSelected = selectedList.includes(opt);
+                        return `<button type="button" class="tag-btn ${isSelected ? 'tag-active' : ''}" data-tag="${opt}">${opt}</button>`;
+                    }).join('');
+
+                    valueControlHtml = `
+                        <div class="tag-group-container">
+                            ${tagsHtml}
+                        </div>
+                        <!-- 隱藏的 input 用來跟既有的同步邏輯接軌 -->
+                        <input type="hidden" class="attr-input attr-val" value="${val}">
+                    `;
+                } 
+                // 次要判斷：單選下拉選單
+                else if (options && Array.isArray(options)) {
+                    let selectOptionsHtml = options.map(opt => {
+                        const selected = (val === opt) ? 'selected' : '';
+                        return `<option value="${opt}" ${selected}>${opt}</option>`;
+                    }).join('');
+
+                    if (val && !options.includes(val)) {
+                        selectOptionsHtml = `<option value="${val}" selected>${val} (自訂)</option>` + selectOptionsHtml;
+                    }
+
+                    valueControlHtml = `
+                        <select class="attr-input attr-val">
+                            ${selectOptionsHtml}
+                        </select>
+                    `;
+                } 
+                // 預設：普通純文字框
+                else {
+                    valueControlHtml = `
+                        <input type="text" class="attr-input attr-val" value="${val}" placeholder="屬性值 (Value)">
+                    `;
+                }
+
                 html += `
                     <tr data-idx="${idx}">
                         <td>
                             <input type="text" class="attr-input attr-key" value="${key}" placeholder="屬性名 (Key)">
                         </td>
                         <td>
-                            <input type="text" class="attr-input attr-val" value="${val}" placeholder="屬性值 (Value)">
+                            ${valueControlHtml}
                         </td>
                         <td>
                             <button class="hud-btn small danger btn-del-attr">🗑 刪除</button>
@@ -68,28 +116,32 @@ export class ShowView {
     }
 
     bindEvents() {
-        document.getElementById('edit-node-name')?.addEventListener('input', (e) => {
-            if (this.currentNode) {
-                this.currentNode.name = e.target.value;
-                this.onNodeUpdated();
+        // 重命名節點 Key
+        document.getElementById('edit-node-name')?.addEventListener('change', (e) => {
+            const newName = e.target.value.trim();
+            if (newName && newName !== this.currentInfo.nodeName) {
+                this.onNodeUpdated({
+                    action: 'rename_node',
+                    pathArr: this.currentInfo.pathArr,
+                    newName: newName
+                });
             }
         });
 
-        if (this.currentNode?.type === 'folder') return;
+        if (!this.currentInfo.isData) return;
 
-        // 安全防護：避免重名 Key 被無預警覆蓋
+        // 同步 DOM 輸入資料至內部物件
         const syncAttributes = () => {
             const newAttrs = {};
             const rows = this.container.querySelectorAll('#attr-body tr');
-            
+
             rows.forEach(row => {
                 const keyInput = row.querySelector('.attr-key');
                 const valInput = row.querySelector('.attr-val');
                 let key = keyInput ? keyInput.value.trim() : '';
                 const val = valInput ? valInput.value : '';
-                
+
                 if (key !== '') {
-                    // 如果出現重複的 Key，自動加上數字標記，防止蓋掉資料
                     let originalKey = key;
                     let counter = 1;
                     while (newAttrs.hasOwnProperty(key)) {
@@ -100,29 +152,61 @@ export class ShowView {
                 }
             });
 
-            this.currentNode.attributes = newAttrs;
-            this.onNodeUpdated();
+            for (const k in this.currentInfo.data) delete this.currentInfo.data[k];
+            Object.assign(this.currentInfo.data, newAttrs);
+            
+            this.onNodeUpdated({ action: 'update_data' });
         };
 
+        // 當 Key 或 Value (Input/Select) 改變時，同步觸發資料寫回
         this.container.querySelectorAll('.attr-key, .attr-val').forEach(input => {
             input.addEventListener('input', syncAttributes);
+            input.addEventListener('change', (e) => {
+                // 如果是 Key 改變了，重新渲染畫面讓它有機會匹配到新的 <select> 選單
+                if (e.target.classList.contains('attr-key')) {
+                    this.render(this.currentInfo);
+                }
+                syncAttributes();
+            });
         });
 
+        // 👈 新增：多選標籤 (Tag Button) 點擊切換事件
+        this.container.querySelectorAll('.tag-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tagBtn = e.currentTarget;
+                const td = tagBtn.closest('td'); // 精準抓取當前這格表格
+                const hiddenInput = td?.querySelector('.attr-val');
+
+                // 1. 切換點亮/熄滅狀態
+                tagBtn.classList.toggle('tag-active');
+
+                // 2. 收集所有點亮的標籤
+                const activeTags = Array.from(td.querySelectorAll('.tag-btn.tag-active'))
+                                        .map(b => b.dataset.tag);
+
+                // 3. 更新隱藏欄位並觸發資料寫回
+                if (hiddenInput) {
+                    hiddenInput.value = activeTags.join(', ');
+                }
+                syncAttributes();
+            });
+        });
+
+        // 新增屬性
         document.getElementById('btn-add-attr')?.addEventListener('click', () => {
-            if (!this.currentNode.attributes) this.currentNode.attributes = {};
-            
-            let count = Object.keys(this.currentNode.attributes).length + 1;
+            let count = Object.keys(this.currentInfo.data).length + 1;
             let newKey = `新屬性_${count}`;
-            while (this.currentNode.attributes.hasOwnProperty(newKey)) {
+            while (this.currentInfo.data.hasOwnProperty(newKey)) {
                 count++;
                 newKey = `新屬性_${count}`;
             }
 
-            this.currentNode.attributes[newKey] = '';
-            this.render(this.currentNode);
-            this.onNodeUpdated();
+            this.currentInfo.data[newKey] = '';
+            this.render(this.currentInfo);
+            this.onNodeUpdated({ action: 'update_data' });
         });
 
+        // 刪除屬性
         this.container.querySelectorAll('.btn-del-attr').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const row = e.target.closest('tr');
