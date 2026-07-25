@@ -1,5 +1,6 @@
 import { TreeView } from './tree.js';
 import { ShowView } from './show.js';
+import { VisualView } from './view.js'; // 引入顯示模式邏輯
 
 const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyQ2UUfi5r-L3uuPv0hqskdjItB2p7rFE-RPajC2G5g9QpOSSY583hAI8oo-_FJQTz0/exec';
 
@@ -155,6 +156,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             statusEl.className = 'status-error';
         }
     };
+
+    // --- 新增：顯示模式與編輯模式的切換邏輯 ---
+    let currentMode = 'edit';
+    const visualView = new VisualView('view-mode-container');
+
+    document.getElementById('btn-toggle-mode')?.addEventListener('click', (e) => {
+        const editContainer = document.getElementById('edit-mode-container');
+        const viewContainer = document.getElementById('view-mode-container');
+        const syncBtn = document.getElementById('btn-sync-cloud');
+        
+        if (currentMode === 'edit') {
+            // 切換到顯示模式
+            currentMode = 'view';
+            document.body.classList.add('view-mode-active');
+            e.target.textContent = '🛠️ 切換編輯模式';
+            editContainer.classList.add('hidden');
+            viewContainer.classList.remove('hidden');
+            syncBtn.style.display = 'none';
+            // 將最新的資料傳入顯示模式並渲染
+            visualView.render(rawDictData); 
+        } else {
+            // 切換回編輯模式
+            currentMode = 'edit';
+            document.body.classList.remove('view-mode-active');
+            e.target.textContent = '👁️ 切換顯示模式';
+            viewContainer.classList.add('hidden');
+            editContainer.classList.remove('hidden');
+            syncBtn.style.display = 'block';
+        }
+    });
 
     await loadInitialData();
 });

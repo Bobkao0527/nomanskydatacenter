@@ -1,0 +1,134 @@
+/* 切換至顯示模式時的變數覆寫 (亮藍色調) */
+body.view-mode-active {
+    --primary-color: #00f0ff;
+    --secondary-color: #0088ff;
+    --dark-bg: #000a12;
+    --panel-bg: rgba(0, 240, 255, 0.04);
+    
+    --text-main: #00f0ff;
+    --text-muted: #007799;
+    --text-light: #a3e8ff;
+    
+    --status-ok: #00ffaa;
+    --glow-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
+    --border-glow: 0 0 6px rgba(0, 240, 255, 0.7), inset 0 0 12px rgba(0, 240, 255, 0.2);
+}
+
+body.view-mode-active {
+    background-image: 
+        linear-gradient(rgba(0, 240, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.05) 1px, transparent 1px);
+}
+
+.hidden { display: none !important; }
+
+/* --- 顯示模式佈局 --- */
+.view-layout {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 15px;
+    height: 100%;
+    position: relative;
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    background: var(--panel-bg);
+    padding: 20px;
+    overflow: hidden;
+}
+
+.view-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--primary-color);
+    padding-bottom: 10px;
+}
+
+.view-path {
+    font-size: 18px;
+    color: var(--secondary-color);
+    letter-spacing: 2px;
+    text-shadow: var(--glow-shadow);
+    flex: 1;
+    text-align: center;
+}
+
+/* 頂部資料區 */
+.view-info-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px dashed var(--primary-color);
+    padding: 15px;
+}
+.info-block { border-left: 3px solid var(--secondary-color); padding-left: 10px; }
+.info-title { color: var(--secondary-color); font-size: 14px; margin-bottom: 8px; }
+.info-item { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+.info-key { color: var(--text-muted); }
+.info-val { color: var(--text-light); }
+
+/* 下方互動區 */
+.view-content-area {
+    flex: 1;
+    display: flex;
+    gap: 20px;
+    overflow: hidden;
+}
+
+/* 列表樣式 */
+.view-list-container {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    align-content: start;
+    gap: 15px;
+}
+.view-card {
+    border: 1px solid var(--primary-color);
+    background: rgba(0, 240, 255, 0.05);
+    padding: 15px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.3s;
+}
+.view-card:hover {
+    background: rgba(0, 240, 255, 0.2);
+    box-shadow: var(--glow-shadow);
+    transform: scale(1.02);
+}
+
+/* 星球層 3D 佈局 */
+.planet-view-grid {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    gap: 20px;
+}
+.canvas-container {
+    flex: 1;
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle, rgba(0,240,255,0.1) 0%, #000 70%);
+}
+.landmark-list {
+    width: 300px;
+    overflow-y: auto;
+    border-left: 1px solid var(--primary-color);
+    padding-left: 15px;
+}
+.landmark-item {
+    padding: 10px;
+    border: 1px solid transparent;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.landmark-item:hover, .landmark-item.active {
+    background: rgba(0, 240, 255, 0.15);
+    border-color: var(--secondary-color);
+}
