@@ -3,71 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>No Man's Sky 資訊終端 | TERMINAL OS</title>
+    <title>No Man's Sky 資訊終端 | INFINITE TREE OS</title>
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/theme-hud.css">
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="hud-container">
         <header class="hud-header">
             <div class="hud-logo">無人深空 資訊終端</div>
-            <div class="hud-status">SYS_STATUS: <span class="status-ok">DB_ONLINE</span></div>
+            <div class="hud-actions">
+                <button class="hud-btn primary" id="btn-sync-cloud">☁️ SYNC TO CLOUD</button>
+                <span class="hud-status">SYS_STATUS: <span id="sys-status" class="status-ok">DB_OFFLINE</span></span>
+            </div>
         </header>
 
         <main class="hud-layout">
             <aside class="sidebar">
                 <div class="panel-title">[ DATA_TREE ]</div>
-                <!-- 搜尋與篩選 -->
                 <div class="search-box">
-                    <input type="text" id="search-input" class="hud-input" placeholder="SEARCH SYSTEM / PLANET...">
+                    <input type="text" id="search-input" class="hud-input" placeholder="SEARCH NODES...">
+                </div>
+
+                <!-- 指標動作按鈕區 -->
+                <div class="tree-toolbar">
+                    <button class="hud-btn small" id="btn-add-folder">+ FOLDER</button>
+                    <button class="hud-btn small" id="btn-add-data">+ DATA</button>
+                    <button class="hud-btn small danger" id="btn-delete-node">🗑 DELETE</button>
                 </div>
                 
                 <div class="tree-container" id="tree-root">
-                    <div style="text-align:center; color: var(--text-muted); margin-top: 20px;">[ LOADING DATA... ]</div>
+                    <div style="text-align:center; color: var(--text-muted); margin-top: 20px;">[ INITIALIZING... ]</div>
                 </div>
-                <button class="hud-btn add-btn" id="btn-add-data">+ ADD NEW DATA</button>
             </aside>
 
             <section class="detail-panel">
-                <div class="panel-title">[ DETAILS ]</div>
+                <div class="panel-title">[ NODE_EDITOR ]</div>
                 <div class="data-display" id="data-display">
-                    <div style="text-align:center; color: var(--text-muted); margin-top: 50px;">NO DATA SELECTED</div>
+                    <div style="text-align:center; color: var(--text-muted); margin-top: 50px;">NO NODE SELECTED</div>
                 </div>
                 <div class="hud-corner top-right"></div>
                 <div class="hud-corner bottom-right"></div>
             </section>
         </main>
-    </div>
-
-    <!-- 新增資料用的 Modal (預設隱藏) -->
-    <div id="data-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>[ INPUT_REQUIREMENT ]</h3>
-                <span class="close-modal" id="btn-close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>資料類型</label>
-                    <select id="form-data-type" class="hud-input">
-                        <option value="system">星系 (System)</option>
-                        <option value="planet">星球 (Planet)</option>
-                        <option value="waypoint">標記點 (Waypoint)</option>
-                    </select>
-                </div>
-                
-                <!-- 動態表單區域 -->
-                <div id="dynamic-form-fields"></div>
-                
-            </div>
-            <div class="modal-footer">
-                <button class="hud-btn" id="btn-submit-form">UPLOAD DATA</button>
-            </div>
-            <div class="hud-corner top-right"></div>
-            <div class="hud-corner bottom-right"></div>
-        </div>
     </div>
 
     <script type="module" src="js/app.js"></script>

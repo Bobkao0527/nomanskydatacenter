@@ -1,0 +1,113 @@
+:root {
+    --primary-color: #ff8c00;
+    --secondary-color: #ffaa00;
+    --dark-bg: #0a0601;
+    --panel-bg: rgba(255, 140, 0, 0.04);
+    
+    --text-main: #ff9d00;
+    --text-muted: #a66a12;
+    --text-light: #ffce85;
+    
+    --status-ok: #00ffaa;
+    --status-warning: #ff3300;
+    
+    --glow-shadow: 0 0 10px rgba(255, 140, 0, 0.4);
+    --border-glow: 0 0 5px rgba(255, 140, 0, 0.6), inset 0 0 10px rgba(255, 140, 0, 0.2);
+    --font-mono: 'Share Tech Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background-color: var(--dark-bg);
+    color: var(--text-main);
+    font-family: var(--font-mono);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-image: 
+        linear-gradient(rgba(255, 140, 0, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 140, 0, 0.05) 1px, transparent 1px);
+    background-size: 30px 30px;
+}
+
+.hud-container {
+    width: 95vw;
+    height: 95vh;
+    border: 2px solid var(--primary-color);
+    box-shadow: var(--border-glow);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    position: relative;
+    background: radial-gradient(circle at center, rgba(255, 140, 0, 0.05) 0%, var(--dark-bg) 100%);
+}
+
+.hud-header {
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--primary-color); padding-bottom: 15px; margin-bottom: 15px;
+}
+.hud-logo { font-size: 24px; font-weight: bold; color: var(--secondary-color); text-shadow: var(--glow-shadow); letter-spacing: 3px; }
+.hud-actions { display: flex; align-items: center; gap: 15px; }
+
+.status-ok { color: var(--status-ok); text-shadow: 0 0 8px var(--status-ok); }
+.status-error { color: var(--status-warning); text-shadow: 0 0 8px var(--status-warning); }
+
+.hud-layout { display: flex; flex: 1; gap: 20px; overflow: hidden; }
+.sidebar { width: 340px; border-right: 1px solid rgba(255, 140, 0, 0.3); display: flex; flex-direction: column; padding-right: 15px; }
+.detail-panel { flex: 1; background: var(--panel-bg); border: 1px solid rgba(255, 140, 0, 0.2); padding: 25px; position: relative; overflow-y: auto; }
+
+.panel-title { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; letter-spacing: 2px; }
+
+/* --- 搜尋與樹狀工具列 --- */
+.search-box { margin-bottom: 10px; }
+.hud-input { 
+    width: 100%; background: rgba(255, 140, 0, 0.05); border: 1px solid var(--primary-color); 
+    color: var(--text-light); font-family: var(--font-mono); padding: 8px 12px; font-size: 14px; outline: none;
+}
+.hud-input:focus { box-shadow: var(--border-glow); background: rgba(255, 140, 0, 0.1); }
+
+.tree-toolbar { display: flex; gap: 5px; margin-bottom: 12px; }
+
+/* --- 按鈕樣式 --- */
+.hud-btn { 
+    background: rgba(255, 140, 0, 0.05); border: 1px solid var(--primary-color); 
+    color: var(--primary-color); font-family: var(--font-mono); padding: 8px 14px; 
+    cursor: pointer; transition: all 0.2s; font-size: 13px; text-transform: uppercase;
+}
+.hud-btn:hover { background: var(--primary-color); color: var(--dark-bg); box-shadow: var(--glow-shadow); }
+.hud-btn.small { padding: 4px 8px; font-size: 12px; flex: 1; }
+.hud-btn.primary { background: rgba(255, 170, 0, 0.2); font-weight: bold; }
+.hud-btn.danger { border-color: var(--status-warning); color: var(--status-warning); }
+.hud-btn.danger:hover { background: var(--status-warning); color: var(--dark-bg); }
+
+/* --- 遞迴樹狀圖樣式 --- */
+.tree-container { flex: 1; overflow-y: auto; font-size: 14px; }
+.tree-list { list-style: none; padding-left: 12px; }
+.tree-list .tree-list { border-left: 1px dashed rgba(255, 140, 0, 0.3); margin-left: 6px; display: none; }
+.tree-item.open > .tree-list { display: block; }
+.tree-item.hidden { display: none !important; }
+.tree-item { margin: 4px 0; }
+
+.node-label { cursor: pointer; padding: 5px 8px; transition: all 0.2s; display: flex; align-items: center; gap: 6px; border: 1px solid transparent; }
+.node-label:hover { background: rgba(255, 140, 0, 0.15); }
+.node-label.selected { border-color: var(--secondary-color); background: rgba(255, 170, 0, 0.25); text-shadow: var(--glow-shadow); }
+
+.node-icon { font-size: 12px; display: inline-block; width: 14px; text-align: center; }
+.node-folder { color: var(--secondary-color); font-weight: bold; }
+.node-data { color: var(--text-light); }
+
+/* --- 右側編輯面板區 --- */
+.editor-header { border-bottom: 1px solid rgba(255, 140, 0, 0.3); padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+.editor-header input { font-size: 22px; color: var(--secondary-color); background: transparent; border: none; border-bottom: 1px dashed var(--primary-color); outline: none; width: 70%; font-family: var(--font-mono); }
+
+.attr-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+.attr-table th { text-align: left; padding: 8px; color: var(--text-muted); border-bottom: 1px solid var(--primary-color); font-size: 13px; }
+.attr-table td { padding: 8px; }
+.attr-input { width: 100%; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,140,0,0.4); color: var(--text-light); padding: 6px; font-family: var(--font-mono); }
+
+.hud-corner { position: absolute; width: 16px; height: 16px; border: 2px solid var(--secondary-color); pointer-events: none; }
+.hud-corner.top-right { top: -1px; right: -1px; border-left: none; border-bottom: none; }
+.hud-corner.bottom-right { bottom: -1px; right: -1px; border-left: none; border-top: none; }

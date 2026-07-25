@@ -1,0 +1,15 @@
+{
+  "defaultFolder": {
+    "name": "新資料夾",
+    "type": "folder",
+    "children": []
+  },
+  "defaultData": {
+    "name": "新資料項目",
+    "type": "data",
+    "attributes": {
+      "狀態": "待記錄",
+      "備註": ""
+    }
+  }
+}
