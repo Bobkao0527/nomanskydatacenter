@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NMS ATLAS TERMINAL</title>
+    <title>無人深空終端</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <!-- Three.js 3D 渲染引擎 -->
@@ -14,7 +14,7 @@
         <header class="hud-header">
             <div class="logo">
                 <span class="icon">♦</span>
-                <h1>NMS ATLAS_OS // v1.0.6</h1>
+                <h1>[無人深空終端]</h1>
             </div>
             <div class="status-panel">
                 <span id="connection-status" class="status-indicator">STATUS: WAITING</span>
@@ -25,39 +25,65 @@
 
         <main class="hud-main">
             <aside class="hud-sidebar">
-                <div class="sidebar-header">
-                    <h2>> SYSTEM_INDEX</h2>
+                <!-- 模式切換器 -->
+                <div class="mode-switcher">
+                    <button id="btn-mode-terminal" class="mode-btn active" onclick="app.switchMode('terminal')">⚡ 終端索引</button>
+                    <button id="btn-mode-trade" class="mode-btn" onclick="app.switchMode('trade')">🚀 跑商模式</button>
                 </div>
 
-                <!-- 多重條件篩選器區域 -->
-                <div class="filter-box">
-                    <div class="filter-header">
-                        <span class="filter-title">⚡ FILTER_MATRIX</span>
-                        <button class="clear-filter-btn" onclick="app.clearFilters()">[CLEAR]</button>
+                <!-- 1. 終端模式側邊區域 -->
+                <div id="terminal-sidebar-section">
+                    <div class="sidebar-header">
+                        <h2>> SYSTEM_INDEX</h2>
                     </div>
 
-                    <!-- 啟用中的篩選標籤列表 -->
-                    <div id="active-filters-tags" class="active-filters-tags"></div>
+                    <!-- 多重條件篩選器區域 -->
+                    <div class="filter-box">
+                        <div class="filter-header">
+                            <span class="filter-title">⚡ FILTER_MATRIX</span>
+                            <button class="clear-filter-btn" onclick="app.clearFilters()">[CLEAR]</button>
+                        </div>
 
-                    <!-- 選擇篩選欄位與數值 -->
-                    <div class="filter-add-controls">
-                        <select id="filter-field-select" class="hud-select mini-select" onchange="app.onFilterFieldChange()">
-                            <option value="">+ 選擇篩選欄位...</option>
-                        </select>
-                        <select id="filter-value-select" class="hud-select mini-select" style="display:none;" onchange="app.addSelectedFilter()">
-                            <option value="">-- 選擇數值 --</option>
+                        <div id="active-filters-tags" class="active-filters-tags"></div>
+
+                        <div class="filter-add-controls">
+                            <select id="filter-field-select" class="hud-select mini-select" onchange="app.onFilterFieldChange()">
+                                <option value="">+ 選擇篩選欄位...</option>
+                            </select>
+                            <select id="filter-value-select" class="hud-select mini-select" style="display:none;" onchange="app.addSelectedFilter()">
+                                <option value="">-- 選擇數值 --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="sidebar-list-container" style="flex:1; overflow-y:auto;">
+                        <ul id="system-list" class="system-list"></ul>
+                    </div>
+
+                    <button class="hud-btn add-btn" onclick="app.promptAddSystem()">+ NEW_SYSTEM</button>
+                </div>
+
+                <!-- 2. 跑商模式側邊區域 -->
+                <div id="trade-sidebar-section" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                    <div class="sidebar-header">
+                        <h2>> TRADE_ROUTES</h2>
+                    </div>
+
+                    <div class="filter-box">
+                        <div class="filter-header">
+                            <span class="filter-title">⚙ 路線篩選器</span>
+                        </div>
+                        <select id="trade-filter-type" class="hud-select mini-select" onchange="TradeUI.renderSidebar(app)">
+                            <option value="all">所有路線 (全部)</option>
+                            <option value="closed">僅顯示 🟢 閉合循環</option>
+                            <option value="open">僅顯示 🟡 開放鏈條</option>
                         </select>
                     </div>
-                </div>
 
-                <!-- 側邊欄清單（一般星系清單 / 篩選後的星球清單） -->
-                <div id="sidebar-list-container" style="flex:1; overflow-y:auto;">
-                    <ul id="system-list" class="system-list">
-                        <!-- JS injected -->
-                    </ul>
+                    <div style="flex:1; overflow-y:auto;">
+                        <ul id="trade-route-list" class="system-list"></ul>
+                    </div>
                 </div>
-
-                <button class="hud-btn add-btn" onclick="app.promptAddSystem()">+ NEW_SYSTEM</button>
             </aside>
 
             <section class="hud-content" id="main-content">
@@ -67,6 +93,9 @@
             </section>
         </main>
     </div>
+
+    <!-- 載入模組 -->
+    <script src="commercial.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
