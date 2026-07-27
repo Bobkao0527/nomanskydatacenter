@@ -2,28 +2,18 @@
 
 // 1. 跑商計算引擎
 const TradeEngine = {
-    // 無人深空官方經濟循環對應表
+    // 無人深空精確經濟循環對應表
     ECONOMY_MAP: {
-        // 3 步循環 (Loop 3)
-        '交易': { loop: 3, step: 1, next: '先進材料' },
-        '商貿': { loop: 3, step: 1, next: '先進材料' },
-        '商業': { loop: 3, step: 1, next: '先進材料' },
+        // --- 3 步循環 (Loop 3) ---
+        '貿易':     { loop: 3, step: 1, next: '先進材料' },
         '先進材料': { loop: 3, step: 2, next: '科學' },
-        '材料': { loop: 3, step: 2, next: '科學' },
-        '融合': { loop: 3, step: 2, next: '科學' },
-        '科學': { loop: 3, step: 3, next: '交易' },
-        '研究': { loop: 3, step: 3, next: '交易' },
+        '科學':     { loop: 3, step: 3, next: '貿易' },
 
-        // 4 步循環 (Loop 4)
-        '採礦': { loop: 4, step: 1, next: '製造' },
-        '開採': { loop: 4, step: 1, next: '製造' },
-        '製造': { loop: 4, step: 2, next: '高科技' },
-        '加工': { loop: 4, step: 2, next: '高科技' },
-        '工業': { loop: 4, step: 2, next: '高科技' },
-        '高科技': { loop: 4, step: 3, next: '發電' },
-        '技術': { loop: 4, step: 3, next: '發電' },
-        '發電': { loop: 4, step: 4, next: '採礦' },
-        '能源': { loop: 4, step: 4, next: '採礦' }
+        // --- 4 步循環 (Loop 4) ---
+        '採礦':     { loop: 4, step: 1, next: '製造' },
+        '製造':     { loop: 4, step: 2, next: '高科技' },
+        '高科技':   { loop: 4, step: 3, next: '能源生產' },
+        '能源生產': { loop: 4, step: 4, next: '採礦' }
     },
 
     getEconInfo(rawType) {
@@ -40,11 +30,14 @@ const TradeEngine = {
         return isNaN(num) ? 0 : Math.abs(num);
     },
 
-    getTierMultiplier(tierStr) {
-        if(!tierStr) return 1.0;
-        if(tierStr.includes('3') || tierStr.includes('富裕') || tierStr.includes('繁榮') || tierStr.includes('高階') || tierStr.includes('先進')) return 1.3;
-        if(tierStr.includes('2') || tierStr.includes('中等') || tierStr.includes('平庸')) return 1.1;
-        return 1.0;
+    // 依據數字等級 (1, 2, 3, 4) 給予加權倍率
+    getTierMultiplier(tierVal) {
+        if (tierVal === undefined || tierVal === null) return 1.0;
+        const num = parseInt(String(tierVal).trim(), 10);
+        if (num === 4) return 1.5; // 黑市 / 海盜星系（最高利潤/高風險加權）
+        if (num === 3) return 1.3;
+        if (num === 2) return 1.1;
+        return 1.0; // T1 預設倍率
     },
 
     calculateLegProfit(sysA, sysB) {
@@ -247,13 +240,14 @@ const TradeUI = {
             const sys = app.data[sysName];
             const econType = sys['星系經濟']?.['經濟類型'] || '未知';
             const econTier = sys['星系經濟']?.['經濟等級'] || '未知';
+            const tierLabel = String(econTier) === '4' ? '🏴‍☠️ 黑市/海盜' : `T${econTier} 級經濟`;
 
             html += `
                 <div class="trade-node-card">
                     <div class="node-step">STEP ${idx + 1}</div>
                     <div class="node-title">${sysName}</div>
                     <div class="node-tag">${econType}</div>
-                    <div style="font-size:0.75rem; color:rgba(212,241,249,0.6); margin-top:4px;">${econTier}</div>
+                    <div style="font-size:0.75rem; color:rgba(212,241,249,0.6); margin-top:4px;">${tierLabel}</div>
                 </div>
             `;
 
