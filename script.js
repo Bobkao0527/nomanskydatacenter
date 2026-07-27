@@ -18,17 +18,16 @@ const Planet3D = {
     init(container) {
         if (!container) return;
         
-        // 重新初始化前先銷毀舊有動畫循環與渲染器，防止疊加導致轉速過快
+        // 重新初始化前銷毀舊有動畫循環與渲染器
         this.destroy();
 
-        container.innerHTML = ''; // 清空容器
+        container.innerHTML = '';
         this.isAutoRotating = true;
         this.targetRotationY = null;
 
         const width = container.clientWidth || 320;
         const height = container.clientHeight || 320;
 
-        // 場景、攝影機、渲染器
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
         this.camera.position.z = 5.2;
@@ -38,11 +37,10 @@ const Planet3D = {
         this.renderer.setPixelRatio(window.devicePixelRatio);
         container.appendChild(this.renderer.domElement);
 
-        // 星球主體群組
         this.planetGroup = new THREE.Group();
         this.scene.add(this.planetGroup);
 
-        // 外層金屬線框網格
+        // 外層網格
         const sphereGeo = new THREE.SphereGeometry(1.8, 24, 24);
         const wireMat = new THREE.MeshBasicMaterial({
             color: 0x00f3ff,
@@ -53,7 +51,7 @@ const Planet3D = {
         const wireSphere = new THREE.Mesh(sphereGeo, wireMat);
         this.planetGroup.add(wireSphere);
 
-        // 核心發光點陣球體
+        // 核心發光點陣
         const innerGeo = new THREE.SphereGeometry(1.78, 16, 16);
         const innerMat = new THREE.PointsMaterial({
             color: 0xbc13fe,
@@ -71,7 +69,6 @@ const Planet3D = {
         ring.rotation.x = Math.PI / 2;
         this.planetGroup.add(ring);
 
-        // 地標點容器
         this.markersGroup = new THREE.Group();
         this.planetGroup.add(this.markersGroup);
 
@@ -92,7 +89,6 @@ const Planet3D = {
     renderLandmarks(landmarksObj) {
         if (!this.markersGroup) return;
 
-        // 清除舊地標
         while (this.markersGroup.children.length > 0) {
             this.markersGroup.remove(this.markersGroup.children[0]);
         }
@@ -107,7 +103,6 @@ const Planet3D = {
 
             const pos = this.latLonToVector3(lat, lon);
 
-            // 地標節點小球 (移除球心光束線，僅留點位)
             const markerGeo = new THREE.SphereGeometry(0.06, 12, 12);
             const markerMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
             const markerMesh = new THREE.Mesh(markerGeo, markerMat);
@@ -125,20 +120,16 @@ const Planet3D = {
         const item = this.markersMap[lName];
         if (!item) return;
 
-        // 計算讓目標經度面向使用者 (+Z) 的 Y 軸旋轉角
         const targetRad = -((item.lon + 180) * (Math.PI / 180)) + Math.PI / 2;
         this.targetRotationY = targetRad;
         this.isAutoRotating = false;
 
-        // 重置所有地標高光
         this.resetHighlights();
 
-        // 設置當前地標為高光紅色脈衝樣式
         item.mesh.material.color.setHex(0xff003c);
         item.mesh.scale.set(2.2, 2.2, 2.2);
         this.activeMarkerName = lName;
 
-        // 5秒後重置高光並恢復自轉
         if (this.highlightTimeout) clearTimeout(this.highlightTimeout);
         this.highlightTimeout = setTimeout(() => {
             this.resetHighlights();
@@ -163,9 +154,7 @@ const Planet3D = {
             if (this.isAutoRotating) {
                 this.planetGroup.rotation.y += 0.005;
             } else if (this.targetRotationY !== null) {
-                // 平滑內插旋轉 (Lerp)
                 let diff = this.targetRotationY - this.planetGroup.rotation.y;
-                // 處理角度跨越 2PI
                 diff = Math.atan2(Math.sin(diff), Math.cos(diff));
                 this.planetGroup.rotation.y += diff * 0.08;
             }
@@ -197,6 +186,7 @@ const app = {
     options: {},
     currentSystem: null,
     currentPlanet: null,
+    activeFilters: [], // 儲存當前發揮作用的篩選條件 [{ field: '天氣', value: '宜人' }, ...]
 
     setStatus(msg, type = '') {
         const el = document.getElementById('connection-status');
@@ -219,6 +209,7 @@ const app = {
             }
 
             this.setStatus('ONLINE', 'success');
+            this.setupFilterControls();
             this.renderSidebar();
             
             if(this.currentSystem && this.data[this.currentSystem]) {
@@ -260,26 +251,209 @@ const app = {
         }
     },
 
+    // --- 篩選控制邏輯 ---
+    setupFilterControls() {
+        const fieldSelect = document.getElementById('filter-field-select');
+        if(!fieldSelect) return;
+
+        fieldSelect.innerHTML = '<option value="">+ 新增篩選條件...</option>';
+        
+        const allKeys = new Set();
+        if(this.options.valueOptions) Object.keys(this.options.valueOptions).forEach(k => allKeys.add(k));
+        if(this.options.multiSelectOptions) Object.keys(this.options.multiSelectOptions).forEach(k => allKeys.add(k));
+
+        allKeys.forEach(key => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = key;
+            fieldSelect.appendChild(opt);
+        });
+    },
+
+    onFilterFieldChange() {
+        const fieldSelect = document.getElementById('filter-field-select');
+        const valSelect = document.getElementById('filter-value-select');
+        const selectedField = fieldSelect.value;
+
+        if(!selectedField) {
+            valSelect.style.display = 'none';
+            return;
+        }
+
+        let optsArr = [];
+        if(this.options.valueOptions && this.options.valueOptions[selectedField]) {
+            optsArr = this.options.valueOptions[selectedField];
+        } else if(this.options.multiSelectOptions && this.options.multiSelectOptions[selectedField]) {
+            optsArr = this.options.multiSelectOptions[selectedField];
+        }
+
+        valSelect.innerHTML = '<option value="">-- 選擇數值 --</option>';
+        optsArr.forEach(val => {
+            const opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = val;
+            valSelect.appendChild(opt);
+        });
+
+        valSelect.style.display = 'block';
+    },
+
+    addSelectedFilter() {
+        const fieldSelect = document.getElementById('filter-field-select');
+        const valSelect = document.getElementById('filter-value-select');
+        const field = fieldSelect.value;
+        const value = valSelect.value;
+
+        if(!field || !value) return;
+
+        // 避免重複新增相同的欄位值
+        const exists = this.activeFilters.some(f => f.field === field && f.value === value);
+        if(!exists) {
+            this.activeFilters.push({ field, value });
+        }
+
+        // 重置選單狀態
+        fieldSelect.value = '';
+        valSelect.value = '';
+        valSelect.style.display = 'none';
+
+        this.renderFilterTags();
+        this.renderSidebar();
+    },
+
+    removeFilter(index) {
+        this.activeFilters.splice(index, 1);
+        this.renderFilterTags();
+        this.renderSidebar();
+    },
+
+    clearFilters() {
+        this.activeFilters = [];
+        const fieldSelect = document.getElementById('filter-field-select');
+        const valSelect = document.getElementById('filter-value-select');
+        if(fieldSelect) fieldSelect.value = '';
+        if(valSelect) { valSelect.value = ''; valSelect.style.display = 'none'; }
+        this.renderFilterTags();
+        this.renderSidebar();
+    },
+
+    renderFilterTags() {
+        const tagsContainer = document.getElementById('active-filters-tags');
+        if(!tagsContainer) return;
+
+        tagsContainer.innerHTML = '';
+        this.activeFilters.forEach((f, idx) => {
+            const chip = document.createElement('span');
+            chip.className = 'filter-chip';
+            chip.innerHTML = `${f.field}: <strong>${f.value}</strong> <button class="filter-del" onclick="app.removeFilter(${idx})">✕</button>`;
+            tagsContainer.appendChild(chip);
+        });
+    },
+
+    // 進行疊加條件計算，找出符合所有 Filter 的星球
+    getFilteredPlanets() {
+        if (this.activeFilters.length === 0) return null;
+
+        const matchedList = []; // [{ sysName, pName }, ...]
+
+        for (let sysName in this.data) {
+            const sys = this.data[sysName];
+            const planets = this.getPlanets(sysName);
+
+            planets.forEach(pName => {
+                const pData = sys[pName];
+                let isMatch = true;
+
+                for (let filter of this.activeFilters) {
+                    const { field, value } = filter;
+                    let fieldValue = null;
+
+                    // 尋找對應屬性 (從星系層級或星球層級)
+                    if (sys['星系政治'] && sys['星系政治'][field] !== undefined) fieldValue = sys['星系政治'][field];
+                    else if (sys['星系經濟'] && sys['星系經濟'][field] !== undefined) fieldValue = sys['星系經濟'][field];
+                    else if (pData['環境概覽'] && pData['環境概覽'][field] !== undefined) fieldValue = pData['環境概覽'][field];
+                    else if (pData['自然資源'] && pData['自然資源'][field] !== undefined) fieldValue = pData['自然資源'][field];
+
+                    // 比對邏輯
+                    if (Array.isArray(fieldValue)) {
+                        if (!fieldValue.includes(value)) { isMatch = false; break; }
+                    } else if (typeof fieldValue === 'string') {
+                        if (fieldValue.includes(',')) {
+                            const arr = fieldValue.split(',').map(s => s.trim());
+                            if (!arr.includes(value)) { isMatch = false; break; }
+                        } else if (fieldValue !== value) {
+                            isMatch = false; break;
+                        }
+                    } else {
+                        isMatch = false; break;
+                    }
+                }
+
+                if (isMatch) {
+                    matchedList.push({ sysName, pName });
+                }
+            });
+        }
+
+        return matchedList;
+    },
+
     renderSidebar() {
         const list = document.getElementById('system-list');
         list.innerHTML = '';
-        for (let sysName in this.data) {
-            const li = document.createElement('li');
-            li.textContent = sysName;
-            if(sysName === this.currentSystem) li.classList.add('active');
-            
-            li.onclick = (e) => {
-                if(e.target.tagName !== 'BUTTON') this.selectSystem(sysName);
-            };
 
-            const delBtn = document.createElement('button');
-            delBtn.className = 'del-btn';
-            delBtn.textContent = 'X';
-            delBtn.onclick = () => this.deleteSystem(sysName);
-            li.appendChild(delBtn);
+        const filteredPlanets = this.getFilteredPlanets();
 
-            list.appendChild(li);
+        if (filteredPlanets !== null) {
+            // === 顯示篩選模式（星球清單） ===
+            if (filteredPlanets.length === 0) {
+                list.innerHTML = `<li style="color:var(--danger); cursor:default;">// NO MATCHING PLANETS</li>`;
+                return;
+            }
+
+            filteredPlanets.forEach(item => {
+                const li = document.createElement('li');
+                const isCurrent = (item.sysName === this.currentSystem && item.pName === this.currentPlanet);
+                if (isCurrent) li.classList.add('active');
+
+                li.innerHTML = `
+                    <div style="display:flex; flex-direction:column; gap:2px;">
+                        <span>🪐 ${item.pName}</span>
+                        <span class="sys-badge-sub">SYSTEM: ${item.sysName}</span>
+                    </div>
+                `;
+
+                li.onclick = () => this.navigateToPlanet(item.sysName, item.pName);
+                list.appendChild(li);
+            });
+
+        } else {
+            // === 顯示預設模式（星系清單） ===
+            for (let sysName in this.data) {
+                const li = document.createElement('li');
+                li.textContent = sysName;
+                if(sysName === this.currentSystem) li.classList.add('active');
+                
+                li.onclick = (e) => {
+                    if(e.target.tagName !== 'BUTTON') this.selectSystem(sysName);
+                };
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'del-btn';
+                delBtn.textContent = 'X';
+                delBtn.onclick = () => this.deleteSystem(sysName);
+                li.appendChild(delBtn);
+
+                list.appendChild(li);
+            }
         }
+    },
+
+    navigateToPlanet(sysName, pName) {
+        this.currentSystem = sysName;
+        this.currentPlanet = pName;
+        this.renderSidebar();
+        this.renderSystemContent();
     },
 
     selectSystem(sysName) {
@@ -348,7 +522,6 @@ const app = {
                             <button class="hud-btn" style="font-size: 0.8rem; padding: 2px 6px;" onclick="app.promptAddLandmark()">+ NEW_LANDMARK</button>
                         </div>
                         
-                        <!-- 雙欄版面：左側 3D 星球，右側地標列表 -->
                         <div class="landmarks-section-container">
                             <div class="planet-3d-wrapper">
                                 <div id="planet-3d-canvas"></div>
@@ -367,7 +540,6 @@ const app = {
 
         document.getElementById('main-content').innerHTML = html;
 
-        // DOM 繪製完成後初始化 3D 星球與載入地標點
         if (this.currentPlanet && sys[this.currentPlanet]) {
             setTimeout(() => {
                 const canvasContainer = document.getElementById('planet-3d-canvas');

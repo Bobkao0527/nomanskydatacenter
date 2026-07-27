@@ -14,7 +14,7 @@
         <header class="hud-header">
             <div class="logo">
                 <span class="icon">♦</span>
-                <h1>NMS ATLAS_OS // v1.0.5</h1>
+                <h1>NMS ATLAS_OS // v1.0.6</h1>
             </div>
             <div class="status-panel">
                 <span id="connection-status" class="status-indicator">STATUS: WAITING</span>
@@ -28,9 +28,35 @@
                 <div class="sidebar-header">
                     <h2>> SYSTEM_INDEX</h2>
                 </div>
-                <ul id="system-list" class="system-list">
-                    <!-- JS injected -->
-                </ul>
+
+                <!-- 多重條件篩選器區域 -->
+                <div class="filter-box">
+                    <div class="filter-header">
+                        <span class="filter-title">⚡ FILTER_MATRIX</span>
+                        <button class="clear-filter-btn" onclick="app.clearFilters()">[CLEAR]</button>
+                    </div>
+
+                    <!-- 啟用中的篩選標籤列表 -->
+                    <div id="active-filters-tags" class="active-filters-tags"></div>
+
+                    <!-- 選擇篩選欄位與數值 -->
+                    <div class="filter-add-controls">
+                        <select id="filter-field-select" class="hud-select mini-select" onchange="app.onFilterFieldChange()">
+                            <option value="">+ 選擇篩選欄位...</option>
+                        </select>
+                        <select id="filter-value-select" class="hud-select mini-select" style="display:none;" onchange="app.addSelectedFilter()">
+                            <option value="">-- 選擇數值 --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 側邊欄清單（一般星系清單 / 篩選後的星球清單） -->
+                <div id="sidebar-list-container" style="flex:1; overflow-y:auto;">
+                    <ul id="system-list" class="system-list">
+                        <!-- JS injected -->
+                    </ul>
+                </div>
+
                 <button class="hud-btn add-btn" onclick="app.promptAddSystem()">+ NEW_SYSTEM</button>
             </aside>
 

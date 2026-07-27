@@ -61,9 +61,88 @@ body {
 
 .hud-sidebar {
     width: 280px; border-right: 1px solid var(--purple); display: flex; flex-direction: column;
-    background: rgba(188, 19, 254, 0.05); padding: 15px; overflow-y: auto;
+    background: rgba(188, 19, 254, 0.05); padding: 15px; overflow-y: hidden;
 }
-.sidebar-header h2 { font-size: 1.2rem; color: var(--purple); margin-bottom: 20px; text-shadow: 0 0 5px var(--purple); }
+.sidebar-header h2 { font-size: 1.2rem; color: var(--purple); margin-bottom: 10px; text-shadow: 0 0 5px var(--purple); }
+
+/* --- 篩選器樣式 (Filter Box) --- */
+.filter-box {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(0, 243, 255, 0.3);
+    padding: 10px;
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.filter-title {
+    font-size: 0.85rem;
+    color: var(--cyan);
+    text-shadow: 0 0 5px var(--cyan);
+}
+
+.clear-filter-btn {
+    background: transparent;
+    border: none;
+    color: var(--danger);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.clear-filter-btn:hover {
+    text-shadow: 0 0 5px var(--danger);
+}
+
+.active-filters-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(188, 19, 254, 0.2);
+    border: 1px solid var(--purple);
+    color: var(--text-main);
+    padding: 2px 6px;
+    font-size: 0.75rem;
+}
+
+.filter-chip strong {
+    color: var(--cyan);
+}
+
+.filter-del {
+    background: transparent;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    font-size: 0.8rem;
+    margin-left: 2px;
+}
+
+.filter-add-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.sys-badge-sub {
+    font-size: 0.75rem;
+    color: rgba(212, 241, 249, 0.5);
+}
 
 .system-list { list-style: none; flex: 1; }
 .system-list li {
@@ -74,7 +153,7 @@ body {
 .system-list li.active { border-color: var(--cyan); background: var(--cyan-dim); text-shadow: 0 0 5px var(--cyan); box-shadow: 0 0 8px var(--cyan-dim); border-left: 4px solid var(--cyan); }
 .system-list li .del-btn { position: absolute; right: 5px; top: 5px; background: transparent; border: none; color: var(--danger); cursor: pointer; font-family: var(--font-mono); }
 
-.add-btn { width: 100%; margin-top: 10px; border-style: dashed; }
+.add-btn { width: 100%; margin-top: 10px; border-style: dashed; flex-shrink: 0; }
 
 .hud-content { flex: 1; padding: 25px; overflow-y: auto; }
 
@@ -95,7 +174,7 @@ body {
 }
 .input-group input:focus { border-color: var(--cyan); box-shadow: 0 0 8px var(--cyan-dim); }
 
-/* --- HUD 下拉選單樣式 --- */
+/* HUD 下拉選單 */
 .hud-select {
     flex: 1;
     background: #020205;
@@ -116,12 +195,12 @@ body {
     color: var(--cyan);
 }
 .mini-select {
-    margin-top: 5px;
+    margin-top: 2px;
     font-size: 0.8rem;
     padding: 3px 6px;
 }
 
-/* --- 多選標籤晶片樣式 --- */
+/* 多選標籤晶片 */
 .multi-select-box {
     flex: 1;
     display: flex;
@@ -168,7 +247,7 @@ body {
     text-shadow: 0 0 5px var(--danger);
 }
 
-/* --- 星球頁籤與刪除按鈕 --- */
+/* 星球頁籤 */
 .planet-tabs { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid rgba(188, 19, 254, 0.5); padding-bottom: 10px; overflow-x: auto; }
 .planet-tab {
     display: inline-flex;
@@ -200,7 +279,7 @@ body {
 .planet-container { display: none; }
 .planet-container.active { display: block; animation: fadeIn 0.3s ease; }
 
-/* --- 3D 星球與地標列表雙欄組合 --- */
+/* 3D 星球與地標列表雙欄組合 */
 .landmarks-section-container {
     display: grid;
     grid-template-columns: 320px 1fr;
