@@ -170,6 +170,31 @@ body {
 .tag-del { background: transparent; border: none; color: var(--danger); cursor: pointer; font-family: var(--font-mono); font-size: 0.85rem; font-weight: bold; line-height: 1; padding: 0 2px; }
 .tag-del:hover { color: #ff5577; text-shadow: 0 0 5px var(--danger); }
 
+/* 顏色選擇器樣式 */
+.color-picker-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.color-picker-input {
+    width: 38px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--cyan);
+    background: transparent;
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.color-val-text {
+    font-size: 0.85rem;
+    color: var(--cyan);
+    font-family: var(--font-mono);
+    letter-spacing: 1px;
+}
+
 /* 跑商專屬 UI 樣式 */
 .trade-chip { font-size: 0.75rem; padding: 2px 6px; border-radius: 2px; font-weight: bold; }
 .trade-chip.closed { background: rgba(0, 255, 0, 0.15); border: 1px solid #0f0; color: #0f0; }
@@ -208,6 +233,49 @@ body {
 .hud-table th, .hud-table td { border: 1px solid rgba(0, 243, 255, 0.2); padding: 10px; text-align: left; font-size: 0.9rem; }
 .hud-table th { background: rgba(188, 19, 254, 0.2); color: var(--purple); }
 .hud-table td { background: rgba(0,0,0,0.3); }
+
+/* 星球 3D 大空間介面 */
+.system-3d-wrapper {
+    position: relative;
+    width: 100%;
+    height: 380px;
+    border: 1px solid var(--cyan);
+    background: radial-gradient(circle at center, rgba(188, 19, 254, 0.12) 0%, rgba(2, 2, 5, 0.95) 85%);
+    box-shadow: inset 0 0 20px var(--cyan-dim);
+    margin-bottom: 20px;
+    overflow: hidden;
+}
+
+#system-3d-canvas {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+
+#system-3d-canvas:active {
+    cursor: grabbing;
+}
+
+.system-canvas-overlay {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    font-size: 0.8rem;
+    color: var(--cyan);
+    letter-spacing: 1px;
+    pointer-events: none;
+    text-shadow: 0 0 5px var(--cyan);
+}
+
+.system-canvas-hint {
+    position: absolute;
+    bottom: 10px;
+    right: 12px;
+    font-size: 0.75rem;
+    color: rgba(212, 241, 249, 0.6);
+    pointer-events: none;
+    letter-spacing: 1px;
+}
 
 /* 星球與地標樣式 */
 .planet-tabs { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 1px solid rgba(188, 19, 254, 0.5); padding-bottom: 10px; overflow-x: auto; }

@@ -1,7 +1,322 @@
-// script.js - 主程式控制、資料同步、終端管理與 3D 視覺化
+// script.js - 主程式控制、資料同步、終端管理、星系 3D 空間與 3D 地標視覺化
 const API_URL = "https://script.google.com/macros/s/AKfycbwFFcjV3PdBDoJCqTYajl9tp3rvi07CyTGscz1EWe6rwWII0HgOiKwWnM447U63PNB_/exec";
 
-// 3D 星球檢視模組
+// 1. 全星系 3D 星球空間檢視模組 (System Planetry Space)
+const SystemPlanets3D = {
+    scene: null, camera: null, renderer: null, planetsGroup: null,
+    animFrameId: null, raycaster: new THREE.Raycaster(), mouse: new THREE.Vector2(),
+    clickableMeshes: [], planetNodes: [], boundPointerDown: null,
+    positionsCache: {}, // 記憶體位置快取：[sysName][planetName] = { pos, radius, ringOuter }
+    currentSysName: null,
+    currentSelectedPlanet: null,
+
+    init(container, sysData, sysName, currentPlanetName) {
+        if (!container) return;
+
+        // 同星系熱更新，不銷毀場景，避免畫面閃爍
+        if (this.currentSysName === sysName && this.renderer && container.contains(this.renderer.domElement)) {
+            this.setSelectedPlanet(currentPlanetName);
+            return;
+        }
+
+        this.destroy();
+        this.currentSysName = sysName;
+        this.currentSelectedPlanet = currentPlanetName;
+        container.innerHTML = '';
+        this.clickableMeshes = [];
+        this.planetNodes = [];
+
+        const width = container.clientWidth || 800;
+        const height = container.clientHeight || 380;
+
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        this.camera.position.set(0, 0, 11.5);
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer.setSize(width, height);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(this.renderer.domElement);
+
+        const ambLight = new THREE.AmbientLight(0xffffff, 0.7);
+        this.scene.add(ambLight);
+        const dirLight = new THREE.DirectionalLight(0x00f3ff, 0.8);
+        dirLight.position.set(5, 10, 7);
+        this.scene.add(dirLight);
+
+        this.planetsGroup = new THREE.Group();
+        this.scene.add(this.planetsGroup);
+
+        this.buildPlanets(sysData, sysName, currentPlanetName);
+
+        this.boundPointerDown = (e) => this.onPointerDown(e, container);
+        this.renderer.domElement.addEventListener('pointerdown', this.boundPointerDown);
+
+        this.animate();
+    },
+
+    setSelectedPlanet(planetName) {
+        this.currentSelectedPlanet = planetName;
+        this.planetNodes.forEach(node => {
+            const isSelected = (node.planetName === planetName);
+            const targetS = isSelected ? 1.25 : 1.0;
+            node.targetScale.set(targetS, targetS, targetS);
+
+            if (node.selectionRing) {
+                node.targetRingOpacity = isSelected ? 0.95 : 0.0;
+            }
+
+            if (node.labelSprite) {
+                this.updateLabelSprite(node.labelSprite, node.planetName, isSelected);
+            }
+        });
+    },
+
+    buildPlanets(sysData, sysName, currentPlanetName) {
+        const planetKeys = Object.keys(sysData).filter(k => k !== '星系政治' && k !== '星系經濟');
+        if (planetKeys.length === 0) return;
+
+        if (!this.positionsCache[sysName]) {
+            this.positionsCache[sysName] = {};
+        }
+        const sysCache = this.positionsCache[sysName];
+
+        Object.keys(sysCache).forEach(pName => {
+            if (!planetKeys.includes(pName)) delete sysCache[pName];
+        });
+
+        const rawPlanets = planetKeys.map(pName => {
+            const pData = sysData[pName];
+            const env = pData['環境概覽'] || {};
+            const c1 = env['星球主色'] || '#00f3ff';
+            const c2 = env['星球副色'] || '#bc13fe';
+            const hasRing = (env['是否有星環'] === '是' || env['是否有星環'] === true || env['是否有星環'] === 'true');
+            return { name: pName, data: pData, c1, c2, hasRing };
+        });
+
+        // 絕對 2D 平面 (Z=0) 防碰撞排列演算法
+        const placed = [];
+        rawPlanets.forEach((p, idx) => {
+            let cached = sysCache[p.name];
+
+            if (cached) {
+                placed.push({ ...p, pos: cached.pos.clone(), radius: cached.radius, ringOuter: cached.ringOuter });
+            } else {
+                const radius = 0.55 + (Math.sin(idx * 3.7 + 1.2) * 0.5 + 0.5) * 0.45;
+                const ringOuter = p.hasRing ? radius * 2.1 : radius * 1.15;
+
+                let pos = new THREE.Vector3();
+                let valid = false;
+                let attempts = 0;
+
+                while (!valid && attempts < 500) {
+                    // 強制固定 Z = 0
+                    const x = (Math.random() - 0.5) * 11.5;
+                    const y = (Math.random() - 0.5) * 4.8;
+                    pos.set(x, y, 0);
+
+                    valid = true;
+                    for (let other of placed) {
+                        // 純 2D 距離計算（考慮最大 1.25 倍放大 + 安全間距）
+                        const minDist = (ringOuter + other.ringOuter) * 1.25 + 0.8;
+                        if (pos.distanceTo(other.pos) < minDist) {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    attempts++;
+                }
+
+                sysCache[p.name] = { pos, radius, ringOuter };
+                placed.push({ ...p, pos, radius, ringOuter });
+            }
+        });
+
+        placed.forEach(p => {
+            const planetGroup = new THREE.Group();
+            planetGroup.position.copy(p.pos);
+            planetGroup.userData = { planetName: p.name };
+
+            const isSelected = (p.name === currentPlanetName);
+            const initialScale = isSelected ? 1.25 : 1.0;
+            planetGroup.scale.set(initialScale, initialScale, initialScale);
+
+            // 3D 質感流光 Shader
+            const uniforms = {
+                color1: { value: new THREE.Color(p.c1) },
+                color2: { value: new THREE.Color(p.c2) },
+                time: { value: 0 }
+            };
+
+            const vertShader = `
+                varying vec3 vPosition;
+                varying vec3 vNormal;
+                void main() {
+                    vPosition = position;
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `;
+
+            const fragShader = `
+                uniform vec3 color1;
+                uniform vec3 color2;
+                uniform float time;
+                varying vec3 vPosition;
+                varying vec3 vNormal;
+
+                void main() {
+                    vec3 normPos = normalize(vPosition);
+                    float wave = sin(normPos.y * 4.5 + normPos.x * 2.5 + time * 1.6) * 0.5 + 0.5;
+                    float mixFactor = clamp((normPos.y + wave * 0.4 + 1.0) * 0.5, 0.0, 1.0);
+                    vec3 baseColor = mix(color1, color2, mixFactor);
+
+                    float rim = 1.0 - max(0.0, dot(vNormal, vec3(0.0, 0.0, 1.0)));
+                    rim = pow(rim, 2.2);
+
+                    vec3 finalColor = baseColor + vec3(0.8, 0.95, 1.0) * rim * 0.5;
+                    gl_FragColor = vec4(finalColor, 0.95);
+                }
+            `;
+
+            const material = new THREE.ShaderMaterial({
+                uniforms, vertexShader: vertShader, fragmentShader: fragShader, transparent: true
+            });
+
+            const sphereGeo = new THREE.SphereGeometry(p.radius, 32, 32);
+            const planetMesh = new THREE.Mesh(sphereGeo, material);
+            planetMesh.userData = { planetName: p.name };
+            planetGroup.add(planetMesh);
+            this.clickableMeshes.push(planetMesh);
+
+            // 科幻網格線
+            const wireGeo = new THREE.SphereGeometry(p.radius * 1.015, 16, 16);
+            const wireMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.1 });
+            planetGroup.add(new THREE.Mesh(wireGeo, wireMat));
+
+            // 星環
+            if (p.hasRing) {
+                const ringGeo = new THREE.RingGeometry(p.radius * 1.35, p.radius * 2.1, 64);
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.85
+                });
+                const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+                ringMesh.rotation.x = Math.PI / 2.3;
+                ringMesh.rotation.y = Math.PI / 10;
+                planetGroup.add(ringMesh);
+            }
+
+            // 正對鏡頭的選中科幻外框 (Billboard Circle)
+            const frameGeo = new THREE.RingGeometry(p.radius * 1.18, p.radius * 1.25, 64);
+            const frameMat = new THREE.MeshBasicMaterial({
+                color: 0x00f3ff, side: THREE.DoubleSide, transparent: true, opacity: isSelected ? 0.95 : 0.0
+            });
+            const selectionRing = new THREE.Mesh(frameGeo, frameMat);
+            planetGroup.add(selectionRing);
+
+            // 文字標籤
+            const sprite = this.createLabelSprite(p.name, isSelected);
+            sprite.position.set(0, p.radius + 0.5, 0);
+            planetGroup.add(sprite);
+
+            this.planetsGroup.add(planetGroup);
+
+            this.planetNodes.push({
+                planetName: p.name,
+                group: planetGroup,
+                planetMesh,
+                selectionRing,
+                labelSprite: sprite,
+                uniforms,
+                targetScale: new THREE.Vector3(initialScale, initialScale, initialScale),
+                targetRingOpacity: isSelected ? 0.95 : 0.0,
+                rotSpeed: 0.004 + (Math.sin(p.radius * 10) * 0.003 + 0.003)
+            });
+        });
+    },
+
+    createLabelSprite(pName, isSelected) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256; canvas.height = 64;
+        this.drawLabelCanvas(canvas, pName, isSelected);
+
+        const labelTex = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: labelTex, transparent: true });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(3.3, 0.825, 1);
+        sprite.userData = { canvas, labelTex };
+        return sprite;
+    },
+
+    updateLabelSprite(sprite, pName, isSelected) {
+        if (!sprite || !sprite.userData.canvas) return;
+        this.drawLabelCanvas(sprite.userData.canvas, pName, isSelected);
+        sprite.userData.labelTex.needsUpdate = true;
+    },
+
+    drawLabelCanvas(canvas, pName, isSelected) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = 'Bold 22px "Share Tech Mono", monospace';
+        ctx.fillStyle = isSelected ? '#00f3ff' : '#d4f1f9';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = isSelected ? '#00f3ff' : '#bc13fe';
+        ctx.shadowBlur = 8;
+        ctx.fillText((isSelected ? '▶ ' : '') + pName, 128, 40);
+    },
+
+    onPointerDown(event, container) {
+        const rect = container.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.clickableMeshes, false);
+
+        if (intersects.length > 0) {
+            const hitMesh = intersects[0].object;
+            const pName = hitMesh.userData.planetName;
+            if (pName) {
+                app.selectPlanet(pName);
+            }
+        }
+    },
+
+    animate() {
+        this.animFrameId = requestAnimationFrame(() => this.animate());
+
+        this.planetNodes.forEach(node => {
+            node.planetMesh.rotation.y += node.rotSpeed;
+            if (node.uniforms && node.uniforms.time) {
+                node.uniforms.time.value += 0.015;
+            }
+
+            // Lerp 60fps 平滑縮放動畫
+            node.group.scale.lerp(node.targetScale, 0.1);
+
+            // 外圈淡入淡出動畫
+            if (node.selectionRing) {
+                const curOpacity = node.selectionRing.material.opacity;
+                node.selectionRing.material.opacity += (node.targetRingOpacity - curOpacity) * 0.1;
+            }
+        });
+
+        if (this.renderer && this.scene && this.camera) {
+            this.renderer.render(this.scene, this.camera);
+        }
+    },
+
+    destroy() {
+        if (this.animFrameId) cancelAnimationFrame(this.animFrameId);
+        if (this.renderer && this.renderer.domElement && this.boundPointerDown) {
+            this.renderer.domElement.removeEventListener('pointerdown', this.boundPointerDown);
+        }
+        if (this.renderer) this.renderer.dispose();
+        this.currentSysName = null;
+    }
+};
+
+// 2. 單一星球地標 3D 檢視模組
 const Planet3D = {
     scene: null, camera: null, renderer: null, planetGroup: null, markersGroup: null,
     markersMap: {}, isAutoRotating: true, targetRotationY: null, highlightTimeout: null, animFrameId: null,
@@ -128,11 +443,11 @@ const Planet3D = {
     }
 };
 
-// 全域 App 控制器
+// 3. 全域 App 控制器
 const app = {
     data: {},
     options: {},
-    currentMode: 'terminal', // 'terminal' | 'trade'
+    currentMode: 'terminal',
     currentSystem: null,
     currentPlanet: null,
     currentSelectedRouteId: null,
@@ -215,7 +530,6 @@ const app = {
         }
     },
 
-    // --- 篩選矩陣邏輯 ---
     setupFilterControls() {
         const fieldSelect = document.getElementById('filter-field-select');
         if(!fieldSelect) return;
@@ -287,18 +601,6 @@ const app = {
         this.renderSidebar();
     },
 
-    renderFilterTags() {
-        const tagsContainer = document.getElementById('active-filters-tags');
-        if(!tagsContainer) return;
-        tagsContainer.innerHTML = '';
-        this.activeFilters.forEach((f, idx) => {
-            const chip = document.createElement('span');
-            chip.className = 'filter-chip';
-            chip.innerHTML = `${f.field}: <strong>${f.value}</strong> <button class="filter-del" onclick="app.removeFilter(${idx})">✕</button>`;
-            tagsContainer.appendChild(chip);
-        });
-    },
-
     getFilteredPlanets() {
         if (this.activeFilters.length === 0) return null;
         const matchedList = [];
@@ -336,7 +638,6 @@ const app = {
         return matchedList;
     },
 
-    // --- 側邊欄與星系/星球視圖渲染 ---
     renderSidebar() {
         const list = document.getElementById('system-list');
         list.innerHTML = '';
@@ -419,13 +720,21 @@ const app = {
             </div>
             
             <div class="section-title" style="margin-top: 20px;">
-                <span>[ PLANETARY_DATA ]</span>
+                <span>[ PLANETARY_SPACE // 3D 星球空間 ]</span>
                 <button class="hud-btn highlight" style="font-size: 0.8rem; padding: 4px 8px;" onclick="app.promptAddPlanet()">+ ADD_PLANET</button>
             </div>
         `;
 
         const planets = this.getPlanets(this.currentSystem);
         if(planets.length > 0) {
+            html += `
+                <div class="system-3d-wrapper">
+                    <div id="system-3d-canvas"></div>
+                    <div class="system-canvas-overlay">// SYSTEM_PLANETS_SPACE</div>
+                    <div class="system-canvas-hint">💡 點擊 3D 星球可直接切換檢視詳細數據與地標</div>
+                </div>
+            `;
+
             html += `<div class="planet-tabs">`;
             planets.forEach(pName => {
                 const activeCls = (pName === this.currentPlanet) ? 'active' : '';
@@ -441,7 +750,7 @@ const app = {
                 const pData = sys[this.currentPlanet];
                 html += `<div class="planet-container active">
                     <div class="data-grid">
-                        ${this.generatePlanetCardHTML(this.currentPlanet, '環境概覽', pData['環境概覽'], ['類型', '天氣', '巡警', '植物群', '動物群'])}
+                        ${this.generatePlanetCardHTML(this.currentPlanet, '環境概覽', pData['環境概覽'], ['類型', '天氣', '巡警', '植物群', '動物群', '星球主色', '星球副色', '是否有星環'])}
                         ${this.generatePlanetCardHTML(this.currentPlanet, '自然資源', pData['自然資源'], ['植物', '礦物'])}
                     </div>
                     
@@ -469,12 +778,19 @@ const app = {
 
         document.getElementById('main-content').innerHTML = html;
 
-        if (this.currentPlanet && sys[this.currentPlanet]) {
+        if (planets.length > 0) {
             setTimeout(() => {
-                const canvasContainer = document.getElementById('planet-3d-canvas');
-                if (canvasContainer) {
-                    Planet3D.init(canvasContainer);
-                    Planet3D.renderLandmarks(sys[this.currentPlanet]['地標點']);
+                const sysCanvas = document.getElementById('system-3d-canvas');
+                if (sysCanvas) {
+                    SystemPlanets3D.init(sysCanvas, sys, this.currentSystem, this.currentPlanet);
+                }
+
+                if (this.currentPlanet && sys[this.currentPlanet]) {
+                    const planetCanvas = document.getElementById('planet-3d-canvas');
+                    if (planetCanvas) {
+                        Planet3D.init(planetCanvas);
+                        Planet3D.renderLandmarks(sys[this.currentPlanet]['地標點']);
+                    }
                 }
             }, 50);
         }
@@ -485,9 +801,46 @@ const app = {
         this.renderSystemContent();
     },
 
+    refreshSystem3D() {
+        if(this.currentSystem && this.data[this.currentSystem]) {
+            const sysCanvas = document.getElementById('system-3d-canvas');
+            if(sysCanvas) {
+                SystemPlanets3D.init(sysCanvas, this.data[this.currentSystem], this.currentSystem, this.currentPlanet);
+            }
+        }
+    },
+
     renderFieldControl(type, pName, category, key, value) {
         const valOpts = (this.options && this.options.valueOptions) ? this.options.valueOptions[key] : null;
         const multiOpts = (this.options && this.options.multiSelectOptions) ? this.options.multiSelectOptions[key] : null;
+
+        if (key.includes('色') || key.includes('顏色')) {
+            const colorVal = value || (key.includes('主') ? '#00f3ff' : '#bc13fe');
+            const changeHandler = type === 'sys' 
+                ? `app.updateSysData('${category}', '${key}', this.value); app.refreshSystem3D();`
+                : `app.updatePlanetData('${pName}', '${category}', '${key}', this.value); app.refreshSystem3D();`;
+
+            return `
+                <div class="color-picker-wrapper">
+                    <input type="color" class="color-picker-input" value="${colorVal}" onchange="${changeHandler}">
+                    <span class="color-val-text">${colorVal}</span>
+                </div>
+            `;
+        }
+
+        if (key === '是否有星環') {
+            const ringVal = (value === true || value === '是' || value === 'true') ? '是' : '否';
+            const changeHandler = type === 'sys' 
+                ? `app.updateSysData('${category}', '${key}', this.value); app.refreshSystem3D();`
+                : `app.updatePlanetData('${pName}', '${category}', '${key}', this.value); app.refreshSystem3D();`;
+
+            return `
+                <select class="hud-select" onchange="${changeHandler}">
+                    <option value="否" ${ringVal === '否' ? 'selected' : ''}>否</option>
+                    <option value="是" ${ringVal === '是' ? 'selected' : ''}>是 (含白色星環)</option>
+                </select>
+            `;
+        }
 
         if (valOpts) {
             const currentVal = value || '';
@@ -669,7 +1022,16 @@ const app = {
         const name = prompt("輸入新星球名稱:");
         if(!name || this.data[this.currentSystem][name]) return;
         this.data[this.currentSystem][name] = {
-            "環境概覽": { "類型": "", "天氣": "", "巡警": "", "植物群": "", "動物群": "" },
+            "環境概覽": {
+                "類型": "",
+                "天氣": "",
+                "巡警": "",
+                "植物群": "",
+                "動物群": "",
+                "星球主色": "#00f3ff",
+                "星球副色": "#bc13fe",
+                "是否有星環": "否"
+            },
             "自然資源": { "植物": [], "礦物": [] },
             "地標點": {}
         };
