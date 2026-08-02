@@ -94,42 +94,96 @@ const SystemPlanets3D = {
             return { name: pName, data: pData, c1, c2, hasRing };
         });
 
-        // 絕對 2D 平面 (Z=0) 防碰撞排列演算法
+        // 絕對 2D 平面 (Z=0) 防碰撞與邊界優化排列演算法
         const placed = [];
+        const minSafetyMargin = 0.6; // 星球間額外安全保護距離
+
         rawPlanets.forEach((p, idx) => {
+            const radius = 0.55 + (Math.sin(idx * 3.7 + 1.2) * 0.5 + 0.5) * 0.45;
+            const ringOuter = p.hasRing ? radius * 2.1 : radius * 1.15;
+
             let cached = sysCache[p.name];
+            let pos = null;
 
-            if (cached) {
-                placed.push({ ...p, pos: cached.pos.clone(), radius: cached.radius, ringOuter: cached.ringOuter });
-            } else {
-                const radius = 0.55 + (Math.sin(idx * 3.7 + 1.2) * 0.5 + 0.5) * 0.45;
-                const ringOuter = p.hasRing ? radius * 2.1 : radius * 1.15;
+            // 驗證快取位置是否仍安全、不與已放置的星球發生重疊
+            if (cached && cached.pos) {
+                let cacheValid = true;
+                for (let other of placed) {
+                    const requiredDist = (ringOuter + other.ringOuter) * 1.25 + minSafetyMargin;
+                    if (cached.pos.distanceTo(other.pos) < requiredDist) {
+                        cacheValid = false;
+                        break;
+                    }
+                }
+                if (cacheValid) {
+                    pos = cached.pos.clone();
+                }
+            }
 
-                let pos = new THREE.Vector3();
+            // 若無有效快取，進行精準碰撞檢測佈局
+            if (!pos) {
+                let bestPos = null;
                 let valid = false;
-                let attempts = 0;
 
-                while (!valid && attempts < 500) {
-                    // 強制固定 Z = 0
-                    const x = (Math.random() - 0.5) * 11.5;
-                    const y = (Math.random() - 0.5) * 4.8;
-                    pos.set(x, y, 0);
+                // 1. 隨機抽樣尋找適當邊界內位置
+                for (let attempt = 0; attempt < 300; attempt++) {
+                    const x = (Math.random() - 0.5) * 14.0; // [-7.0, 7.0] 範圍
+                    const y = (Math.random() - 0.5) * 5.2;  // [-2.6, 2.6] 範圍
+                    const candidate = new THREE.Vector3(x, y, 0);
 
-                    valid = true;
+                    let collision = false;
                     for (let other of placed) {
-                        // 純 2D 距離計算（考慮最大 1.25 倍放大 + 安全間距）
-                        const minDist = (ringOuter + other.ringOuter) * 1.25 + 0.8;
-                        if (pos.distanceTo(other.pos) < minDist) {
-                            valid = false;
+                        const requiredDist = (ringOuter + other.ringOuter) * 1.25 + minSafetyMargin;
+                        if (candidate.distanceTo(other.pos) < requiredDist) {
+                            collision = true;
                             break;
                         }
                     }
-                    attempts++;
+
+                    if (!collision) {
+                        bestPos = candidate;
+                        valid = true;
+                        break;
+                    }
                 }
 
-                sysCache[p.name] = { pos, radius, ringOuter };
-                placed.push({ ...p, pos, radius, ringOuter });
+                // 2. 若隨機抽樣失敗，採用漸進螺旋演算法確保 100% 不重疊
+                if (!valid) {
+                    let r = 0.6;
+                    let angle = idx * 2.4;
+                    while (!valid && r < 12) {
+                        angle += 0.4;
+                        r += 0.12;
+                        const x = Math.cos(angle) * r * 1.8;
+                        const y = Math.sin(angle) * r * 0.85;
+                        const candidate = new THREE.Vector3(x, y, 0);
+
+                        let collision = false;
+                        for (let other of placed) {
+                            const requiredDist = (ringOuter + other.ringOuter) * 1.25 + minSafetyMargin;
+                            if (candidate.distanceTo(other.pos) < requiredDist) {
+                                collision = true;
+                                break;
+                            }
+                        }
+
+                        if (!collision) {
+                            bestPos = candidate;
+                            valid = true;
+                        }
+                    }
+                }
+
+                // 極端情況保底
+                if (!bestPos) {
+                    bestPos = new THREE.Vector3((idx - rawPlanets.length / 2) * 2.5, 0, 0);
+                }
+
+                pos = bestPos;
             }
+
+            sysCache[p.name] = { pos: pos.clone(), radius, ringOuter };
+            placed.push({ ...p, pos, radius, ringOuter });
         });
 
         placed.forEach(p => {
@@ -194,15 +248,15 @@ const SystemPlanets3D = {
             const wireMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.1 });
             planetGroup.add(new THREE.Mesh(wireGeo, wireMat));
 
-            // 星環
+            // 星環 (優化傾角與旋轉角度，確保從正面視角看寬闊清晰)
             if (p.hasRing) {
                 const ringGeo = new THREE.RingGeometry(p.radius * 1.35, p.radius * 2.1, 64);
                 const ringMat = new THREE.MeshBasicMaterial({
                     color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.85
                 });
                 const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-                ringMesh.rotation.x = Math.PI / 2.3;
-                ringMesh.rotation.y = Math.PI / 10;
+                ringMesh.rotation.x = Math.PI / 3.2; // 調整傾角 (約 56 度)，使星環在正前方顯現飽滿橢圓形
+                ringMesh.rotation.y = Math.PI / 8;   // 側傾立體感
                 planetGroup.add(ringMesh);
             }
 
@@ -216,7 +270,8 @@ const SystemPlanets3D = {
 
             // 文字標籤
             const sprite = this.createLabelSprite(p.name, isSelected);
-            sprite.position.set(0, p.radius + 0.5, 0);
+            const labelYOffset = p.hasRing ? (p.radius * 1.6 + 0.3) : (p.radius + 0.5);
+            sprite.position.set(0, labelYOffset, 0);
             planetGroup.add(sprite);
 
             this.planetsGroup.add(planetGroup);
@@ -241,8 +296,14 @@ const SystemPlanets3D = {
         this.drawLabelCanvas(canvas, pName, isSelected);
 
         const labelTex = new THREE.CanvasTexture(canvas);
-        const spriteMat = new THREE.SpriteMaterial({ map: labelTex, transparent: true });
+        const spriteMat = new THREE.SpriteMaterial({ 
+            map: labelTex, 
+            transparent: true,
+            depthTest: false,
+            depthWrite: false
+        });
         const sprite = new THREE.Sprite(spriteMat);
+        sprite.renderOrder = 999;
         sprite.scale.set(3.3, 0.825, 1);
         sprite.userData = { canvas, labelTex };
         return sprite;
@@ -354,7 +415,7 @@ const Planet3D = {
         const ringGeo = new THREE.RingGeometry(1.81, 1.83, 64);
         const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
         const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.x = Math.PI / 2;
+        ring.rotation.x = Math.PI / 2.4; // 傾斜赤道圈，避免純 90 度視角邊緣切面導致看不到
         this.planetGroup.add(ring);
 
         this.markersGroup = new THREE.Group();
@@ -566,6 +627,27 @@ const app = {
         valSelect.style.display = 'block';
     },
 
+    renderFilterTags() {
+        const container = document.getElementById('active-filters-tags');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (this.activeFilters.length === 0) {
+            container.innerHTML = '<span class="no-tags" style="color:rgba(255,255,255,0.3); font-size:0.8rem;">// 無啟用條件</span>';
+            return;
+        }
+
+        this.activeFilters.forEach((filter, index) => {
+            const tag = document.createElement('span');
+            tag.className = 'tag-chip';
+            tag.innerHTML = `
+                ${filter.field}: ${filter.value}
+                <button class="tag-del" onclick="app.removeFilter(${index})">✕</button>
+            `;
+            container.appendChild(tag);
+        });
+    },
+
     addSelectedFilter() {
         const fieldSelect = document.getElementById('filter-field-select');
         const valSelect = document.getElementById('filter-value-select');
@@ -735,7 +817,7 @@ const app = {
                 </div>
             `;
 
-            html += `<div class="planet-tabs">`;
+            html += `<div class="planet-tabs" id="planet-tabs-container">`;
             planets.forEach(pName => {
                 const activeCls = (pName === this.currentPlanet) ? 'active' : '';
                 html += `
@@ -746,32 +828,8 @@ const app = {
             });
             html += `</div>`;
 
-            if(this.currentPlanet && sys[this.currentPlanet]) {
-                const pData = sys[this.currentPlanet];
-                html += `<div class="planet-container active">
-                    <div class="data-grid">
-                        ${this.generatePlanetCardHTML(this.currentPlanet, '環境概覽', pData['環境概覽'], ['類型', '天氣', '巡警', '植物群', '動物群', '星球主色', '星球副色', '是否有星環'])}
-                        ${this.generatePlanetCardHTML(this.currentPlanet, '自然資源', pData['自然資源'], ['植物', '礦物'])}
-                    </div>
-                    
-                    <div class="data-card" style="margin-bottom:20px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                            <h3>> 地標點與全像定位 (LANDMARKS & 3D NAV)</h3>
-                            <button class="hud-btn" style="font-size: 0.8rem; padding: 2px 6px;" onclick="app.promptAddLandmark()">+ NEW_LANDMARK</button>
-                        </div>
-                        
-                        <div class="landmarks-section-container">
-                            <div class="planet-3d-wrapper">
-                                <div id="planet-3d-canvas"></div>
-                                <div class="canvas-overlay-tag">// HOLO_PLANET_NAV</div>
-                            </div>
-                            <div class="landmark-list-wrapper">
-                                ${this.generateLandmarksListHTML(pData['地標點'])}
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-            }
+            // 獨立出星球詳細數據容器，方便局部更新 DOM
+            html += `<div id="planet-detail-section"></div>`;
         } else {
             html += `<div style="color:var(--cyan-dim);">// NO PLANETARY DATA FOUND. ADD PLANET TO INITIALIZE.</div>`;
         }
@@ -784,21 +842,82 @@ const app = {
                 if (sysCanvas) {
                     SystemPlanets3D.init(sysCanvas, sys, this.currentSystem, this.currentPlanet);
                 }
-
-                if (this.currentPlanet && sys[this.currentPlanet]) {
-                    const planetCanvas = document.getElementById('planet-3d-canvas');
-                    if (planetCanvas) {
-                        Planet3D.init(planetCanvas);
-                        Planet3D.renderLandmarks(sys[this.currentPlanet]['地標點']);
-                    }
-                }
+                this.renderPlanetDetailSection();
             }, 50);
         }
     },
 
     selectPlanet(pName) {
+        if (this.currentPlanet === pName) return;
         this.currentPlanet = pName;
-        this.renderSystemContent();
+
+        const sysCanvas = document.getElementById('system-3d-canvas');
+        // 若是在同星系內切換星球且 3D Canvas 仍正常存在，實施局部更新以避免閃爍與銷毀 Context
+        if (sysCanvas && SystemPlanets3D.currentSysName === this.currentSystem) {
+            // 1. 觸發 3D 星球的 Lerp 漸變平滑縮放動畫
+            SystemPlanets3D.setSelectedPlanet(pName);
+
+            // 2. 更新 Planet Tab 樣式
+            const tabContainer = document.getElementById('planet-tabs-container');
+            if (tabContainer) {
+                const tabs = tabContainer.querySelectorAll('.planet-tab');
+                tabs.forEach(tab => {
+                    const span = tab.querySelector('span');
+                    if (span) {
+                        tab.classList.toggle('active', span.textContent.trim() === pName);
+                    }
+                });
+            }
+
+            // 3. 局部更新星球詳細數據卡片與地標面板
+            this.renderPlanetDetailSection();
+        } else {
+            this.renderSystemContent();
+        }
+    },
+
+    renderPlanetDetailSection() {
+        const detailContainer = document.getElementById('planet-detail-section');
+        if (!detailContainer) return;
+
+        const sys = this.data[this.currentSystem];
+        if (!sys || !this.currentPlanet || !sys[this.currentPlanet]) {
+            detailContainer.innerHTML = '';
+            return;
+        }
+
+        const pData = sys[this.currentPlanet];
+        detailContainer.innerHTML = `
+            <div class="planet-container active">
+                <div class="data-grid">
+                    ${this.generatePlanetCardHTML(this.currentPlanet, '環境概覽', pData['環境概覽'], ['類型', '天氣', '巡警', '植物群', '動物群', '星球主色', '星球副色', '是否有星環'])}
+                    ${this.generatePlanetCardHTML(this.currentPlanet, '自然資源', pData['自然資源'], ['植物', '礦物'])}
+                </div>
+                
+                <div class="data-card" style="margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3>> 地標點與全像定位 (LANDMARKS & 3D NAV)</h3>
+                        <button class="hud-btn" style="font-size: 0.8rem; padding: 2px 6px;" onclick="app.promptAddLandmark()">+ NEW_LANDMARK</button>
+                    </div>
+                    
+                    <div class="landmarks-section-container">
+                        <div class="planet-3d-wrapper">
+                            <div id="planet-3d-canvas"></div>
+                            <div class="canvas-overlay-tag">// HOLO_PLANET_NAV</div>
+                        </div>
+                        <div class="landmark-list-wrapper">
+                            ${this.generateLandmarksListHTML(pData['地標點'])}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const planetCanvas = document.getElementById('planet-3d-canvas');
+        if (planetCanvas) {
+            Planet3D.init(planetCanvas);
+            Planet3D.renderLandmarks(pData['地標點']);
+        }
     },
 
     refreshSystem3D() {
@@ -982,7 +1101,7 @@ const app = {
         let arr = Array.isArray(current) ? current : (current ? current.split(',').map(s=>s.trim()) : []);
         if(!arr.includes(item)) arr.push(item);
         this.data[this.currentSystem][pName][category][key] = arr;
-        this.renderSystemContent();
+        this.renderPlanetDetailSection();
     },
 
     removePlanetMultiSelect(pName, category, key, item) {
@@ -990,7 +1109,7 @@ const app = {
         let current = this.data[this.currentSystem][pName][category][key];
         let arr = Array.isArray(current) ? current : (current ? current.split(',').map(s=>s.trim()) : []);
         this.data[this.currentSystem][pName][category][key] = arr.filter(i => i !== item);
-        this.renderSystemContent();
+        this.renderPlanetDetailSection();
     },
 
     updateLandmarkData(lName, key, value) {
@@ -1055,13 +1174,13 @@ const app = {
         const target = this.data[this.currentSystem][this.currentPlanet]['地標點'];
         if(target[name]) return;
         target[name] = { "類型": "", "經度": "0", "緯度": "0" };
-        this.renderSystemContent();
+        this.renderPlanetDetailSection();
     },
 
     deleteLandmark(lName) {
         if(confirm(`刪除地標 ${lName}?`)) {
             delete this.data[this.currentSystem][this.currentPlanet]['地標點'][lName];
-            this.renderSystemContent();
+            this.renderPlanetDetailSection();
         }
     }
 };
