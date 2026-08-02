@@ -2,7 +2,6 @@
 
 // 1. 跑商計算引擎
 const TradeEngine = {
-    // 無人深空精確經濟循環對應表
     ECONOMY_MAP: {
         // --- 3 步循環 (Loop 3) ---
         '貿易':     { loop: 3, step: 1, next: '先進材料' },
@@ -21,27 +20,30 @@ const TradeEngine = {
         return { key: rawType, ...this.ECONOMY_MAP[rawType] };
     },
 
-    // 購買價格解析：折扣在遊戲中為負數（如 -30% 代表便宜 30% 買入，正向貢獻 +30）
     parseBuyPercent(val) {
         if (!val) return 0;
         const num = parseFloat(String(val).replace(/[^0-9.-]/g, ''));
-        return isNaN(num) ? 0 : -num;
+        if (isNaN(num)) return 0;
+        // 若使用者輸入負數 (-30%) 或正數 (30%)，皆防呆視為正向折扣貢獻
+        return num < 0 ? -num : num; 
     },
 
-    // 出售價格解析：溢價在遊戲中為正數（如 +70% 代表高賣 70%，正向貢獻 +70）
     parseSellPercent(val) {
         if (!val) return 0;
         const num = parseFloat(String(val).replace(/[^0-9.-]/g, ''));
         return isNaN(num) ? 0 : num;
     },
 
-    // 依據星系等級 (1, 2, 3, 4) 直接給予倍率（4 級為黑市/海盜）
+    // 增強型 Tier 解析：從字串中提取數字 (如 "T3", "3級" -> 3)
     getTierMultiplier(tierVal) {
-        const tier = String(tierVal);
+        if (!tierVal) return 1.0;
+        const match = String(tierVal).match(/[1-4]/);
+        const tier = match ? match[0] : '1';
+
         if (tier === '4') return 1.5; // 黑市/海盜
         if (tier === '3') return 1.3;
         if (tier === '2') return 1.1;
-        return 1.0;                  // Tier 1 預設
+        return 1.0;
     },
 
     calculateLegProfit(sysA, sysB) {
@@ -76,7 +78,7 @@ const TradeEngine = {
 
         for (let i = 0; i < systems.length; i++) {
             const startNode = systems[i];
-            const maxChainLen = startNode.econInfo.loop; // 限制 DFS 搜尋步數，避免 3 步環溢出成 4 步鏈
+            const maxChainLen = startNode.econInfo.loop;
 
             const findChains = (currentChain) => {
                 const lastNode = currentChain[currentChain.length - 1];
@@ -135,7 +137,6 @@ const TradeEngine = {
         const avgProfitScore = legs.length > 0 ? (totalRawScore / legs.length) : 0;
         const missingNext = isClosed ? null : chain[chain.length - 1].econInfo.next;
 
-        // 計算閉合環的排序標準化 ID（確保 A->B->C 與 B->C->A 歸為同一個 ID 進行去重）
         let canonicalId;
         if (isClosed) {
             const sortedNames = chain.map(c => c.name).sort().join('->');
@@ -158,9 +159,20 @@ const TradeEngine = {
 
     deduplicateAndSortRoutes(routes) {
         const map = new Map();
+        
+        // 收集所有閉合環的完整鏈條字串 (例如 "A->B->C")
+        const closedChainKeys = new Set(
+            routes.filter(r => r.isClosed).map(r => r.chain.join('->'))
+        );
+
         routes.forEach(r => {
+            // 防呆過濾：若開放鏈的節點順序完全等於某個已閉合環，則視為重複無效開放鏈
+            if (!r.isClosed && closedChainKeys.has(r.chain.join('->'))) {
+                return;
+            }
             if (!map.has(r.id)) map.set(r.id, r);
         });
+
         const unique = Array.from(map.values());
         unique.sort((a, b) => b.totalScore - a.totalScore);
         return unique;
@@ -188,13 +200,13 @@ const TradeUI = {
             return;
         }
 
-        // 若切換過濾器後原選中路線消失，自動重置選取第一條
         if (!filteredRoutes.some(r => r.id === app.currentSelectedRouteId)) {
             app.currentSelectedRouteId = filteredRoutes[0].id;
         }
 
         filteredRoutes.forEach(r => {
             const li = document.createElement('li');
+            li.setAttribute('data-route-id', r.id); // 改用 dataset 綁定 ID，避免子字串比對錯誤
             if (r.id === app.currentSelectedRouteId) li.classList.add('active');
 
             const statusBadge = r.isClosed 
@@ -227,11 +239,10 @@ const TradeUI = {
         if (!route) return;
         app.currentSelectedRouteId = route.id;
 
-        // 手動點選時高亮當前側邊欄項目
+        // 精確透過 data-route-id 進行 active 樣式切換
         const listItems = document.querySelectorAll('#trade-route-list li');
         listItems.forEach(li => {
-            const isMatch = li.innerText.includes(route.chain.join(' ➔ '));
-            li.classList.toggle('active', isMatch);
+            li.classList.toggle('active', li.getAttribute('data-route-id') === route.id);
         });
 
         let html = `
@@ -286,13 +297,17 @@ const TradeUI = {
         });
 
         if (!route.isClosed && route.missingNext) {
+            // 修正缺角提示邏輯：只有只差最後一個星系時才提示「補齊即可閉合」
+            const isOneStepLeft = (route.chain.length === route.loopType - 1);
+            const subText = isOneStepLeft ? '新增即可接成閉合環' : `需延伸此類型以靠近閉合`;
+
             html += `
                 <div class="trade-arrow">➔</div>
                 <div class="trade-node-card missing">
                     <div class="node-step">缺角提醒</div>
                     <div class="node-title" style="color:var(--danger);">尚缺星系</div>
                     <div class="node-tag" style="border-color:var(--danger); color:var(--danger);">需 【${route.missingNext}】</div>
-                    <div style="font-size:0.75rem; color:var(--danger); margin-top:4px;">新增即可接成閉合環</div>
+                    <div style="font-size:0.75rem; color:var(--danger); margin-top:4px;">${subText}</div>
                 </div>
             `;
         }
