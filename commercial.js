@@ -17,61 +17,66 @@ const TradeEngine = {
     },
 
     getEconInfo(rawType) {
-        if(!rawType) return null;
-        for(let key in this.ECONOMY_MAP) {
-            if(rawType.includes(key)) return { key, ...this.ECONOMY_MAP[key] };
-        }
-        return null;
+        if (!rawType || !this.ECONOMY_MAP[rawType]) return null;
+        return { key: rawType, ...this.ECONOMY_MAP[rawType] };
     },
 
-    parsePercent(val) {
-        if(!val) return 0;
+    // 購買價格解析：折扣在遊戲中為負數（如 -30% 代表便宜 30% 買入，正向貢獻 +30）
+    parseBuyPercent(val) {
+        if (!val) return 0;
         const num = parseFloat(String(val).replace(/[^0-9.-]/g, ''));
-        return isNaN(num) ? 0 : Math.abs(num);
+        return isNaN(num) ? 0 : -num;
     },
 
-    // 依據數字等級 (1, 2, 3, 4) 給予加權倍率
+    // 出售價格解析：溢價在遊戲中為正數（如 +70% 代表高賣 70%，正向貢獻 +70）
+    parseSellPercent(val) {
+        if (!val) return 0;
+        const num = parseFloat(String(val).replace(/[^0-9.-]/g, ''));
+        return isNaN(num) ? 0 : num;
+    },
+
+    // 依據星系等級 (1, 2, 3, 4) 直接給予倍率（4 級為黑市/海盜）
     getTierMultiplier(tierVal) {
-        if (tierVal === undefined || tierVal === null) return 1.0;
-        const num = parseInt(String(tierVal).trim(), 10);
-        if (num === 4) return 1.5; // 黑市 / 海盜星系（最高利潤/高風險加權）
-        if (num === 3) return 1.3;
-        if (num === 2) return 1.1;
-        return 1.0; // T1 預設倍率
+        const tier = String(tierVal);
+        if (tier === '4') return 1.5; // 黑市/海盜
+        if (tier === '3') return 1.3;
+        if (tier === '2') return 1.1;
+        return 1.0;                  // Tier 1 預設
     },
 
     calculateLegProfit(sysA, sysB) {
-        const buyDiscount = this.parsePercent(sysA['星系經濟']?.['購買']);
-        const sellMarkup = this.parsePercent(sysB['星系經濟']?.['出售']);
+        const buyDiscountContrib = this.parseBuyPercent(sysA['星系經濟']?.['購買']);
+        const sellMarkupContrib = this.parseSellPercent(sysB['星系經濟']?.['出售']);
         const tierA = this.getTierMultiplier(sysA['星系經濟']?.['經濟等級']);
         const tierB = this.getTierMultiplier(sysB['星系經濟']?.['經濟等級']);
 
-        const rawProfitScore = buyDiscount + sellMarkup;
+        const rawProfitScore = buyDiscountContrib + sellMarkupContrib;
         const weightedScore = rawProfitScore * ((tierA + tierB) / 2);
 
         return {
-            buyDiscount,
-            sellMarkup,
-            rawScore: rawProfitScore,
+            buyDiscountContrib: Math.round(buyDiscountContrib * 10) / 10,
+            sellMarkupContrib: Math.round(sellMarkupContrib * 10) / 10,
+            rawScore: Math.round(rawProfitScore * 10) / 10,
             weightedScore: Math.round(weightedScore * 10) / 10
         };
     },
 
     analyzeRoutes(allData) {
         const systems = [];
-        for(let name in allData) {
+        for (let name in allData) {
             const sys = allData[name];
-            const econType = sys['星系經濟']?.['經濟類型'] || '';
+            const econType = sys['星系經濟']?.['經濟類型'];
             const econInfo = this.getEconInfo(econType);
-            if(econInfo) {
+            if (econInfo) {
                 systems.push({ name, data: sys, econInfo });
             }
         }
 
         const routes = [];
 
-        for(let i = 0; i < systems.length; i++) {
+        for (let i = 0; i < systems.length; i++) {
             const startNode = systems[i];
+            const maxChainLen = startNode.econInfo.loop; // 限制 DFS 搜尋步數，避免 3 步環溢出成 4 步鏈
 
             const findChains = (currentChain) => {
                 const lastNode = currentChain[currentChain.length - 1];
@@ -79,15 +84,15 @@ const TradeEngine = {
 
                 const candidates = systems.filter(s => s.econInfo.key === nextTargetEcon);
 
-                for(let nextSys of candidates) {
+                for (let nextSys of candidates) {
                     const isClosedLoop = (nextSys.name === startNode.name);
 
-                    if(isClosedLoop) {
-                        if(currentChain.length >= 2) {
+                    if (isClosedLoop) {
+                        if (currentChain.length >= 2) {
                             routes.push(this.buildRouteSummary(currentChain, true));
                         }
-                    } else if(currentChain.length < 4) {
-                        if(!currentChain.some(node => node.name === nextSys.name)) {
+                    } else if (currentChain.length < maxChainLen) {
+                        if (!currentChain.some(node => node.name === nextSys.name)) {
                             const newChain = [...currentChain, nextSys];
                             routes.push(this.buildRouteSummary(newChain, false));
                             findChains(newChain);
@@ -107,13 +112,13 @@ const TradeEngine = {
         let totalRawScore = 0;
         const legs = [];
 
-        for(let i = 0; i < chain.length; i++) {
+        for (let i = 0; i < chain.length; i++) {
             const origin = chain[i];
             const dest = isClosed 
                 ? chain[(i + 1) % chain.length] 
                 : (i < chain.length - 1 ? chain[i + 1] : null);
 
-            if(dest) {
+            if (dest) {
                 const legInfo = this.calculateLegProfit(origin.data, dest.data);
                 totalWeightedScore += legInfo.weightedScore;
                 totalRawScore += legInfo.rawScore;
@@ -130,8 +135,17 @@ const TradeEngine = {
         const avgProfitScore = legs.length > 0 ? (totalRawScore / legs.length) : 0;
         const missingNext = isClosed ? null : chain[chain.length - 1].econInfo.next;
 
+        // 計算閉合環的排序標準化 ID（確保 A->B->C 與 B->C->A 歸為同一個 ID 進行去重）
+        let canonicalId;
+        if (isClosed) {
+            const sortedNames = chain.map(c => c.name).sort().join('->');
+            canonicalId = `CLOSED::${sortedNames}::LOOP${chain[0].econInfo.loop}`;
+        } else {
+            canonicalId = `OPEN::${chain.map(c => c.name).join('->')}`;
+        }
+
         return {
-            id: chain.map(c => c.name).join('->') + (isClosed ? '->LOOP' : ''),
+            id: canonicalId,
             chain: chain.map(c => c.name),
             isClosed,
             loopType: chain[0].econInfo.loop,
@@ -145,7 +159,7 @@ const TradeEngine = {
     deduplicateAndSortRoutes(routes) {
         const map = new Map();
         routes.forEach(r => {
-            if(!map.has(r.id)) map.set(r.id, r);
+            if (!map.has(r.id)) map.set(r.id, r);
         });
         const unique = Array.from(map.values());
         unique.sort((a, b) => b.totalScore - a.totalScore);
@@ -157,26 +171,31 @@ const TradeEngine = {
 const TradeUI = {
     renderSidebar(app) {
         const list = document.getElementById('trade-route-list');
-        if(!list) return;
+        if (!list) return;
         list.innerHTML = '';
 
         const routes = TradeEngine.analyzeRoutes(app.data);
         const filterType = document.getElementById('trade-filter-type')?.value || 'all';
 
         const filteredRoutes = routes.filter(r => {
-            if(filterType === 'closed') return r.isClosed;
-            if(filterType === 'open') return !r.isClosed;
+            if (filterType === 'closed') return r.isClosed;
+            if (filterType === 'open') return !r.isClosed;
             return true;
         });
 
-        if(filteredRoutes.length === 0) {
+        if (filteredRoutes.length === 0) {
             list.innerHTML = `<li style="color:var(--danger); cursor:default;">// 無匹配跑商路線</li>`;
             return;
         }
 
+        // 若切換過濾器後原選中路線消失，自動重置選取第一條
+        if (!filteredRoutes.some(r => r.id === app.currentSelectedRouteId)) {
+            app.currentSelectedRouteId = filteredRoutes[0].id;
+        }
+
         filteredRoutes.forEach(r => {
             const li = document.createElement('li');
-            if(r.id === app.currentSelectedRouteId) li.classList.add('active');
+            if (r.id === app.currentSelectedRouteId) li.classList.add('active');
 
             const statusBadge = r.isClosed 
                 ? `<span class="trade-chip closed">🟢 閉合 ${r.loopType} 步環</span>` 
@@ -198,14 +217,22 @@ const TradeUI = {
             list.appendChild(li);
         });
 
-        if(!app.currentSelectedRouteId && filteredRoutes.length > 0) {
-            this.selectRoute(app, filteredRoutes[0]);
+        const selectedRoute = filteredRoutes.find(r => r.id === app.currentSelectedRouteId) || filteredRoutes[0];
+        if (selectedRoute) {
+            this.selectRoute(app, selectedRoute);
         }
     },
 
     selectRoute(app, route) {
+        if (!route) return;
         app.currentSelectedRouteId = route.id;
-        this.renderSidebar(app);
+
+        // 手動點選時高亮當前側邊欄項目
+        const listItems = document.querySelectorAll('#trade-route-list li');
+        listItems.forEach(li => {
+            const isMatch = li.innerText.includes(route.chain.join(' ➔ '));
+            li.classList.toggle('active', isMatch);
+        });
 
         let html = `
             <div class="section-title">
@@ -237,10 +264,10 @@ const TradeUI = {
         `;
 
         route.chain.forEach((sysName, idx) => {
-            const sys = app.data[sysName];
+            const sys = app.data[sysName] || {};
             const econType = sys['星系經濟']?.['經濟類型'] || '未知';
-            const econTier = sys['星系經濟']?.['經濟等級'] || '未知';
-            const tierLabel = String(econTier) === '4' ? '🏴‍☠️ 黑市/海盜' : `T${econTier} 級經濟`;
+            const econTier = String(sys['星系經濟']?.['經濟等級'] || '未知');
+            const tierLabel = econTier === '4' ? '🏴‍☠️ 黑市/海盜' : `T${econTier} 級經濟`;
 
             html += `
                 <div class="trade-node-card">
@@ -251,14 +278,14 @@ const TradeUI = {
                 </div>
             `;
 
-            if(idx < route.chain.length - 1) {
+            if (idx < route.chain.length - 1) {
                 html += `<div class="trade-arrow">➔</div>`;
-            } else if(route.isClosed) {
+            } else if (route.isClosed) {
                 html += `<div class="trade-arrow closed-arrow">🔄 閉合</div>`;
             }
         });
 
-        if(!route.isClosed && route.missingNext) {
+        if (!route.isClosed && route.missingNext) {
             html += `
                 <div class="trade-arrow">➔</div>
                 <div class="trade-node-card missing">
@@ -281,8 +308,8 @@ const TradeUI = {
                     <thead>
                         <tr>
                             <th>航程方向</th>
-                            <th>購買地折扣 (買)</th>
-                            <th>目的地溢價 (賣)</th>
+                            <th>購買地折扣貢獻</th>
+                            <th>目的地溢價貢獻</th>
                             <th>基礎利潤 %</th>
                             <th>加權得分</th>
                         </tr>
@@ -291,12 +318,16 @@ const TradeUI = {
         `;
 
         route.legs.forEach(leg => {
+            const buyText = leg.buyDiscountContrib >= 0 ? `+${leg.buyDiscountContrib}%` : `${leg.buyDiscountContrib}%`;
+            const sellText = leg.sellMarkupContrib >= 0 ? `+${leg.sellMarkupContrib}%` : `${leg.sellMarkupContrib}%`;
+            const rawText = leg.rawScore >= 0 ? `+${leg.rawScore}%` : `${leg.rawScore}%`;
+
             html += `
                 <tr>
                     <td><strong>${leg.from}</strong> (${leg.fromEcon}) ➔ <strong>${leg.to}</strong> (${leg.toEcon})</td>
-                    <td style="color:#0f0;">-${leg.buyDiscount}%</td>
-                    <td style="color:var(--cyan);">+${leg.sellMarkup}%</td>
-                    <td style="color:var(--purple); font-weight:bold;">+${leg.rawScore}%</td>
+                    <td style="color:#0f0;">${buyText}</td>
+                    <td style="color:var(--cyan);">${sellText}</td>
+                    <td style="color:var(--purple); font-weight:bold;">${rawText}</td>
                     <td style="color:var(--cyan); font-weight:bold;">${leg.weightedScore} pts</td>
                 </tr>
             `;

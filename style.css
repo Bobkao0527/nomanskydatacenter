@@ -312,6 +312,107 @@ body {
 .del-btn-icon { background: transparent; border: none; color: var(--danger); font-size: 1rem; cursor: pointer; padding: 2px 5px; font-family: var(--font-mono); transition: 0.2s; }
 .del-btn-icon:hover { color: #ff5577; text-shadow: 0 0 8px var(--danger); }
 
+/* 地標彈窗 (HUD Modal) 樣式 */
+.hud-modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(2, 2, 5, 0.8);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.2s ease;
+}
+
+.hud-modal-overlay.active {
+    display: flex;
+}
+
+.hud-modal-card {
+    width: 90%;
+    max-width: 440px;
+    background: rgba(2, 2, 5, 0.95);
+    border: 1px solid var(--cyan);
+    box-shadow: 0 0 25px var(--cyan-dim), inset 0 0 15px rgba(0, 243, 255, 0.1);
+    padding: 20px;
+    position: relative;
+}
+
+.hud-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--purple);
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+}
+
+.hud-modal-header h3 {
+    color: var(--cyan);
+    font-size: 1.1rem;
+    text-shadow: 0 0 8px var(--cyan);
+    letter-spacing: 1px;
+}
+
+.hud-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--danger);
+    font-size: 1.2rem;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    transition: 0.2s;
+    line-height: 1;
+}
+
+.hud-modal-close:hover {
+    text-shadow: 0 0 8px var(--danger);
+    transform: scale(1.15);
+}
+
+.hud-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.modal-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.modal-info-item label {
+    font-size: 0.82rem;
+    color: var(--purple);
+    text-shadow: 0 0 5px var(--purple-dim);
+}
+
+.modal-info-item input, .modal-info-item .info-value {
+    background: rgba(0, 243, 255, 0.05);
+    border: 1px solid rgba(0, 243, 255, 0.4);
+    color: var(--cyan);
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    outline: none;
+    transition: 0.2s;
+}
+
+.modal-info-item input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px var(--cyan-dim);
+}
+
+.modal-title-val {
+    font-weight: bold;
+    border-color: var(--purple);
+    color: var(--text-main);
+    text-shadow: 0 0 5px var(--purple-dim);
+}
+
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }

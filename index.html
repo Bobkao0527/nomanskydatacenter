@@ -94,6 +94,19 @@
         </main>
     </div>
 
+    <!-- 地標詳細資訊彈窗 (Modal) -->
+    <div id="landmark-modal" class="hud-modal-overlay" onclick="if(event.target === this) app.closeLandmarkModal()">
+        <div class="hud-modal-card">
+            <div class="hud-modal-header">
+                <h3>> LANDMARK_DETAILS</h3>
+                <button class="hud-modal-close" onclick="app.closeLandmarkModal()">✕</button>
+            </div>
+            <div class="hud-modal-body" id="landmark-modal-body">
+                <!-- 動態呈現詳細資訊 -->
+            </div>
+        </div>
+    </div>
+
     <!-- 載入模組 -->
     <script src="commercial.js"></script>
     <script src="script.js"></script>

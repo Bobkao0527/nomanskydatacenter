@@ -1058,6 +1058,59 @@ const app = {
         const activeRow = document.getElementById(`lm-row-${lName}`);
         if(activeRow) activeRow.classList.add('active-lm');
         Planet3D.focusLandmark(lName);
+        this.showLandmarkModal(lName);
+    },
+
+    showLandmarkModal(lName) {
+        if(!this.currentSystem || !this.currentPlanet) return;
+        const targetPlanet = this.data[this.currentSystem][this.currentPlanet];
+        if(!targetPlanet || !targetPlanet['地標點'] || !targetPlanet['地標點'][lName]) return;
+
+        const lData = targetPlanet['地標點'][lName];
+        const modalBody = document.getElementById('landmark-modal-body');
+        if(!modalBody) return;
+
+        modalBody.innerHTML = `
+            <div class="modal-info-item">
+                <label>📍 地標名稱 (NAME)</label>
+                <div class="info-value modal-title-val">${lName}</div>
+            </div>
+            <div class="modal-info-item">
+                <label>🏷 類型 (TYPE)</label>
+                <input type="text" value="${lData['類型'] || ''}" oninput="app.updateLandmarkFromModal('${lName}', '類型', this.value)">
+            </div>
+            <div class="modal-info-item">
+                <label>🌐 經度 (LONGITUDE)</label>
+                <input type="text" value="${lData['經度'] || ''}" oninput="app.updateLandmarkFromModal('${lName}', '經度', this.value)">
+            </div>
+            <div class="modal-info-item">
+                <label>🌐 緯度 (LATITUDE)</label>
+                <input type="text" value="${lData['緯度'] || ''}" oninput="app.updateLandmarkFromModal('${lName}', '緯度', this.value)">
+            </div>
+        `;
+
+        const modal = document.getElementById('landmark-modal');
+        if(modal) modal.classList.add('active');
+    },
+
+    updateLandmarkFromModal(lName, key, value) {
+        this.updateLandmarkData(lName, key, value);
+        // 同步更新列表中的欄位值，確保資訊一致
+        const rowEl = document.getElementById(`lm-row-${lName}`);
+        if(rowEl) {
+            const inputs = rowEl.querySelectorAll('input');
+            if(key === '類型' && inputs[0]) inputs[0].value = value;
+            if(key === '經度' && inputs[1]) inputs[1].value = value;
+            if(key === '緯度' && inputs[2]) inputs[2].value = value;
+        }
+        if(key === '經度' || key === '緯度') {
+            this.refresh3DLandmarks();
+        }
+    },
+
+    closeLandmarkModal() {
+        const modal = document.getElementById('landmark-modal');
+        if(modal) modal.classList.remove('active');
     },
 
     refresh3DLandmarks() {
@@ -1185,4 +1238,9 @@ const app = {
     }
 };
 
-window.onload = () => app.fetchData();
+window.onload = () => {
+    app.fetchData();
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') app.closeLandmarkModal();
+    });
+};
